@@ -10,23 +10,43 @@ function mk(f: SourceFile, index: number, ruleId: string, severity: Severity, me
   return { ruleId, severity, file: f.rel, line, col, message, snippet: lineAt(f.content, index), remediation };
 }
 
-/** Set-2 detectors: route auth, input validation, leaky config. */
+/** Index just past the delimiter that balances the one at `openIdx`, skipping string/template contents. */
+function spanTo(c: string, openIdx: number, open: string, close: string): number {
+  let depth = 0, q = "";
+  for (let i = openIdx; i < c.length; i++) {
+    const ch = c[i] as string;
+    if (q) {
+      if (ch === "\\") { i++; continue; }
+      if (ch === q) q = "";
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") { q = ch; continue; }
+    if (ch === open) depth++;
+    else if (ch === close && --depth === 0) return i + 1;
+  }
+  return c.length;
+}
+
+/** Set-2 detectors: route auth (scoped to the handler), input validation, leaky config. */
 export function routeFindings(files: SourceFile[]): Finding[] {
   const out: Finding[] = [];
   for (const f of files) {
     if (!JS.test(f.rel)) continue;
     const c = f.content;
 
-    // Express route handlers without a visible auth check (review-grade: may be a public route)
+    // Express route handlers — check auth within the handler's own call span only.
     for (const m of c.matchAll(/\b(?:app|router|fastify|server)\s*\.\s*(?:get|post|put|delete|patch|all)\s*\(/gi)) {
       const idx = m.index ?? 0;
-      if (!AUTH.test(c.slice(idx, idx + 500))) out.push(mk(f, idx, "VC-ROUTE-NO-AUTH", "review", "route handler with no visible authentication/authorization check", "Confirm this endpoint is meant to be public; otherwise add an auth middleware / session check."));
+      const scope = c.slice(idx, spanTo(c, idx + m[0].length - 1, "(", ")"));
+      if (!AUTH.test(scope)) out.push(mk(f, idx, "VC-ROUTE-NO-AUTH", "review", "route handler with no visible authentication/authorization check", "Confirm this endpoint is meant to be public; otherwise add an auth middleware / session check."));
     }
-    // Next.js app-router handlers without auth
+    // Next.js app-router handlers — check auth within the function body only.
     if (/(?:^|\/)route\.(?:t|j)sx?$/.test(f.rel)) {
       for (const m of c.matchAll(/export\s+(?:async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH)\s*\(/g)) {
         const idx = m.index ?? 0;
-        if (!AUTH.test(c.slice(idx, idx + 600))) out.push(mk(f, idx, "VC-ROUTE-NO-AUTH", "review", `Next.js ${m[1]} handler with no visible auth/session check`, "Verify this route is public; otherwise gate it with getServerSession()/auth()/middleware."));
+        const brace = c.indexOf("{", idx);
+        const scope = brace >= 0 ? c.slice(idx, spanTo(c, brace, "{", "}")) : c.slice(idx, idx + 400);
+        if (!AUTH.test(scope)) out.push(mk(f, idx, "VC-ROUTE-NO-AUTH", "review", `Next.js ${m[1]} handler with no visible auth/session check`, "Verify this route is public; otherwise gate it with getServerSession()/auth()/middleware."));
       }
     }
     // Reads request input but imports no schema validator
