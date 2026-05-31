@@ -18,14 +18,16 @@ usage:
   vibecheck mcp                            run as an MCP server (stdio) exposing a 'scan' tool
 flags:
   --json   machine-readable output (for agents / CI)
-  --ci     exit non-zero if any finding >= failSeverity (default: high)`;
+  --ci     exit non-zero if a finding >= failSeverity (default: high) AND high-confidence
+  --all    also count medium/review-confidence findings toward the --ci exit code`;
 
 const argv = process.argv.slice(2);
-let json = false, ci = false;
+let json = false, ci = false, all = false;
 const pos: string[] = [];
 for (const a of argv) {
   if (a === "--json") json = true;
   else if (a === "--ci") ci = true;
+  else if (a === "--all") all = true;
   else if (a === "-h" || a === "--help") { console.log(HELP); process.exit(0); }
   else pos.push(a);
 }
@@ -47,7 +49,7 @@ if (cmd === "mcp") {
     const cfg = loadConfig(dir);
     const res = scanProject(dir, cfg);
     console.log(json ? toJSON(res) : formatText(res));
-    process.exit(ci && meetsFail(res.findings, cfg.failSeverity ?? "high") ? 1 : 0);
+    process.exit(ci && meetsFail(res.findings, cfg.failSeverity ?? "high", all ? "review" : "high") ? 1 : 0);
   } catch (e) {
     die(`vibecheck: ${(e as Error).message}`);
   }

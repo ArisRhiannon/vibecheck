@@ -53,7 +53,7 @@ describe("AC5.5 end-to-end", () => {
   test("vulnerable app trips the expected rule set incl. critical", () => {
     const r = scanProject(vuln);
     const ids = new Set(r.findings.map((f) => f.ruleId));
-    for (const id of ["VC-SECRET-GITHUB", "VC-ENV-COMMITTED", "VC-RCE-EVAL", "VC-SQLI-TEMPLATE", "VC-CORS-WILDCARD", "VC-JWT-UNPINNED", "VC-COOKIE-INSECURE", "VC-ROUTE-NO-AUTH"]) {
+    for (const id of ["VC-SECRET-GITHUB", "VC-ENV-COMMITTED", "VC-RCE-EVAL", "VC-SQLI", "VC-CORS-WILDCARD", "VC-JWT-UNPINNED", "VC-COOKIE-INSECURE", "VC-ROUTE-NO-AUTH"]) {
       expect(ids.has(id)).toBe(true);
     }
     expect(r.counts.critical).toBeGreaterThan(0);

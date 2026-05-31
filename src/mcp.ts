@@ -1,11 +1,11 @@
 import { scanProject } from "./engine";
 
-interface RpcReq { jsonrpc?: string; id?: number | string | null; method?: string; params?: { name?: string; arguments?: { dir?: string } } }
+interface RpcReq { jsonrpc?: string; id?: number | string | null; method?: string; params?: { name?: string; arguments?: { dir?: string; includeAll?: boolean } } }
 
 const TOOLS = [{
   name: "scan",
-  description: "Scan a project directory for vibe-coding security / ship-readiness issues (offline, no AI). Run this before declaring a coding task done. Returns findings as JSON.",
-  inputSchema: { type: "object", properties: { dir: { type: "string", description: "project directory to scan (default '.')" } } },
+  description: "Scan a project directory for vibe-coding security / ship-readiness issues (offline, no AI). Returns high-confidence (taint-backed) findings as JSON by default; pass includeAll:true for medium/review too. Run before declaring a coding task done.",
+  inputSchema: { type: "object", properties: { dir: { type: "string", description: "project directory to scan (default '.')" }, includeAll: { type: "boolean", description: "include medium/review-confidence findings (default false)" } } },
 }];
 
 function send(msg: unknown): void {
@@ -25,7 +25,8 @@ function handle(req: RpcReq): void {
       if (req.params?.name !== "scan") { send({ jsonrpc: "2.0", id, error: { code: -32602, message: `unknown tool: ${req.params?.name}` } }); return; }
       try {
         const r = scanProject(req.params.arguments?.dir ?? ".");
-        send({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(r) }], isError: false } });
+        const findings = req.params.arguments?.includeAll ? r.findings : r.findings.filter((f) => f.confidence === "high");
+        send({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify({ findings, counts: r.counts }) }], isError: false } });
       } catch (e) {
         send({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: `error: ${(e as Error).message}` }], isError: true } });
       }

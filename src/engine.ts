@@ -1,9 +1,9 @@
 import { collectFiles } from "./walk";
 import { secretFindings } from "./secrets";
 import { envFindings } from "./envcheck";
-import { codeFindings } from "./codescan";
-import { routeFindings } from "./routes";
-import { type Finding, type Severity, SEVERITY_ORDER } from "./types";
+import { astFindings } from "./analyze2";
+import { miscFindings } from "./misc";
+import { type Finding, type Severity, type Confidence, SEVERITY_ORDER, CONFIDENCE_ORDER } from "./types";
 import type { VibecheckConfig } from "./config";
 
 export interface ScanResult {
@@ -32,7 +32,7 @@ export function countBySeverity(f: Finding[]): Record<Severity, number> {
 /** Scan a project directory with all detectors, honoring `.vibecheck.json`. */
 export function scanProject(dir: string, cfg: VibecheckConfig = {}): ScanResult {
   const files = collectFiles(dir);
-  const raw = [...secretFindings(files), ...envFindings(files), ...codeFindings(files), ...routeFindings(files)];
+  const raw = [...secretFindings(files), ...envFindings(files), ...astFindings(files), ...miscFindings(files)];
   const ignore = new Set(cfg.ignoreRules ?? []);
   const allow = (cfg.allowPaths ?? []).map(globToRe);
   const seen = new Set<string>();
@@ -47,8 +47,9 @@ export function scanProject(dir: string, cfg: VibecheckConfig = {}): ScanResult 
   return { findings: sortFindings(out), counts: countBySeverity(out) };
 }
 
-/** True if any finding is at or above the fail severity. */
-export function meetsFail(findings: Finding[], failSeverity: Severity): boolean {
-  const t = SEVERITY_ORDER[failSeverity];
-  return findings.some((f) => SEVERITY_ORDER[f.severity] >= t);
+/** True if any finding meets the fail severity AND confidence (default: high-confidence only). */
+export function meetsFail(findings: Finding[], failSeverity: Severity, minConfidence: Confidence = "high"): boolean {
+  const s = SEVERITY_ORDER[failSeverity];
+  const c = CONFIDENCE_ORDER[minConfidence];
+  return findings.some((f) => SEVERITY_ORDER[f.severity] >= s && CONFIDENCE_ORDER[f.confidence] >= c);
 }
