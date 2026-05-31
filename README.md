@@ -92,12 +92,13 @@ Taint-backed: `VC-RCE-EVAL`, `VC-RCE-CHILD-PROCESS`, `VC-SQLI`, `VC-XSS-REACT`, 
 
 - **JS/TS/JSX/TSX + Python + Go** (Python needs `python3`, Go needs a `go` toolchain on PATH). More
   languages are roadmap (each via its own real parser, never hand-rolled).
-- **Taint scope:** JS/TS taint is **inter-procedural** — function summaries carry **return-taint** and
-  **parameter→sink** reachability, resolved **within a file and across files by imported name** (1-hop,
-  sanitizers respected). Not tracked (false negatives): aliased/namespace/re-exported imports, helper
-  chains beyond a few hops, methods, destructured params, and names defined in **multiple** files
-  (treated as ambiguous and skipped — to avoid false positives). Python and Go are intra-procedural
-  (Go does not track multi-return assignments like `x, _ := f(src)`).
+- **Taint scope:** JS/TS taint is **inter-procedural with real cross-file module resolution** — function
+  summaries carry **return-taint** and **parameter→sink** reachability, resolved within a file and **across
+  files via resolved relative imports** (named, **aliased** `a as b`, and **namespace** `* as ns`),
+  propagated **multi-hop** by a fixpoint; sanitizers respected. Not tracked (false negatives): re-exports
+  (`export { x } from …`), default exports, CommonJS `require`/dynamic `import()`, bare/package imports,
+  chains deeper than ~7 hops in worst-case file order, methods, and destructured params. Python and Go are
+  intra-procedural (Go does not track multi-return assignments like `x, _ := f(src)`).
 - Config/secret rules are pattern-based where AST adds no value.
 - A high-signal gate and early-warning — **not a proof of security**. Pair it with Semgrep/CodeQL and review.
 

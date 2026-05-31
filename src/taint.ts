@@ -283,7 +283,7 @@ export function crossFileSummaries(files: SourceFile[]): Map<string, Summaries> 
   for (const [rel, ast] of parsed) edges.set(rel, resolveImports(ast, rel, relSet));
   const eff = new Map<string, Summaries>();
   for (const [rel, s] of local) eff.set(rel, new Map(s));
-  for (let iter = 0; iter < 5; iter++) {
+  for (let iter = 0; iter < 8; iter++) {
     let changed = false;
     for (const [rel, ast] of parsed) {
       const base: Summaries = new Map(local.get(rel));
