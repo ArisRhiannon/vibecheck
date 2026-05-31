@@ -39,7 +39,7 @@ pre-flight** that won't drown an agent in false positives.
 
 ## Measured quality (not claimed)
 
-Against a labeled benchmark of **86 cases** across JS/TS, Python **and** Go (vulnerable + safe + deliberately
+Against a labeled benchmark of **91 cases** across JS/TS, Python **and** Go (vulnerable + safe + deliberately
 tricky-safe), the core detectors score (see [`METRICS.md`](METRICS.md), reproduce with `bun benchmark/run.ts`):
 
 - **Precision 100%**, **Recall 100%**, **F1 100%** on the corpus.
@@ -48,8 +48,9 @@ The tricky-safe cases that produce **zero false positives** include: parameteriz
 template SQL, numeric-coerced and schema-validated input, ORM/RegExp `.exec()`, Supabase **anon** /
 Stripe **publishable** keys, hardened cookies, allow-listed CORS, and pinned JWT algorithms — exactly
 the patterns a regex linter trips on. This benchmark is curated; for a **real-world** measurement (9 pinned
-OSS repos, 833 files, manually triaged), see [`docs/CORPUS.md`](docs/CORPUS.md) — which drove two precision
-fixes (fixed-prefix relative redirects, and SSRF requiring a server source not client-side `location`).
+OSS repos, 1,218 files, manually triaged), see [`docs/CORPUS.md`](docs/CORPUS.md) — which exposed a
+critical bug (Python/Go files weren't being scanned in real scans) and drove precision fixes (relative
+redirects, server-source-only SSRF).
 
 ## Confidence (the anti-false-positive-loop design)
 
@@ -97,8 +98,10 @@ Taint-backed: `VC-RCE-EVAL`, `VC-RCE-CHILD-PROCESS`, `VC-SQLI`, `VC-XSS-REACT`, 
   propagated **multi-hop** by a fixpoint; sanitizers respected. Not tracked (false negatives): re-exports
   (`export { x } from …`), default exports, CommonJS `require`/dynamic `import()`, bare/package imports,
   chains deeper than ~7 hops in worst-case file order, methods, and destructured params. **Python** is also
-  inter-procedural (return-taint + param→sink, intra-file and cross-file via resolved `from .mod import`/
-  `import mod`; not resolved: `import a.b` dotted-unaliased, `*`/re-exports, decorators). **Go** is
+  inter-procedural (return-taint + param→sink **and class `@staticmethod` resolution**, intra-file and cross-file via resolved `from .mod import`/
+  `import mod`; not resolved: `import a.b` dotted-unaliased, `*`/re-exports, decorators). Python request
+  **sources** span Flask, Django, **aiohttp** (`request.match_info`, `await request.post()`), FastAPI/
+  Starlette (`request.query_params`/`path_params`, `await request.json()/form()`), Tornado, Bottle, Pyramid. **Go** is
   inter-procedural **within a package** (return-taint + param→sink, same-package by function name);
   cross-package `pkg.Func` calls and multi-return assignments (`x, _ := f(src)`) are not tracked.
 - Config/secret rules are pattern-based where AST adds no value.

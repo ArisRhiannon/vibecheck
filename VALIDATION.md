@@ -223,3 +223,15 @@ Reproduced with `bun scripts/corpus.ts` (network) + full triage:
 - **No regression:** `bun test` 56/56; `bun benchmark/run.ts` 86 cases, precision/recall 100%, 0 FP.
 
 QA: the code-reviewer subagent was unavailable; the SSRF fix was QA'd via adversarial self-test (client `document.location`/`location` silent; server direct + via-var fire) and the full triage above is recorded for scrutiny.
+
+
+## v0.10 — Critical `collectFiles` fix + multi-framework Python sources (validated)
+
+The real-world corpus **found a critical bug**: `collectFiles` (the `scanProject`/CLI/MCP path) omitted `.py`/`.go` from its allowlist, so the Python and Go analyzers **never ran in real scans** (only in unit tests/benchmark, which call them directly). Fixed (+regression test `test/walk.test.ts`).
+- **Impact:** corpus file counts jumped (flask 62→144, gin 18→110, …); **dvpwa's real aiohttp SQLi is now caught at high** (`sqli/views.py:57`).
+- **Multi-framework sources** (aiohttp/FastAPI/Starlette/Django/Tornado/Bottle/Pyramid) + `await`/`Dict` taint + class `@staticmethod` cross-file resolution: closes the dvpwa layered flow (`await request.post()` → `data.get()` → cross-file `Student.create` → `% {'name': name}` → execute).
+- **Adversarial self-QA:** `request.GET`/`match_info`/`query_params`/`self.request.GET` → high SQLi; sanitized `int(...)` and instance/`self` method calls → no finding; a non-request `cfg.headers`/`opts.params` concat surfaces only at **review** confidence (not in the gate), not a high/medium FP.
+- **Corpus precision 7/7 detector-correct, 0 high-confidence false positives** across 6 mature repos after their Python/Go is actually scanned; 5/7 production-exploitable (NodeGoat ×4 + dvpwa).
+- **No regression:** `bun test` 56/56; `bun benchmark/run.ts` 91 cases, precision/recall 100%, 0 FP.
+
+QA: the code-reviewer subagent was unavailable; QA was performed via the adversarial self-test above and the full corpus triage, recorded here for scrutiny.
