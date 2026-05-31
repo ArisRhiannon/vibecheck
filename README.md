@@ -5,8 +5,7 @@
 
 A fast, **agent-native** "safe to ship?" gate for vibe-coded apps. It parses your **JS/TS/JSX/TSX**
 (`@babel/parser`), **Python** (the stdlib `ast`), and **Go** (`go/parser`) with **real parsers** and uses **taint analysis**
-(inter-procedural for JS/TS — return-taint + param→sink summaries, within a file and across files by
-imported name) to flag the security classes AI coding agents get wrong — committed secrets, SQL
+(inter-procedural for JS/TS and Python — return-taint + param→sink summaries, within a file and across files) to flag the security classes AI coding agents get wrong — committed secrets, SQL
 injection through *abstracted* raw-query APIs, XSS, SSRF, path traversal, command injection, insecure
 deserialization, weak JWT/CORS/cookies — and ranks every finding by **confidence** so an agent can fix
 the real ones and ignore the noise.
@@ -97,8 +96,10 @@ Taint-backed: `VC-RCE-EVAL`, `VC-RCE-CHILD-PROCESS`, `VC-SQLI`, `VC-XSS-REACT`, 
   files via resolved relative imports** (named, **aliased** `a as b`, and **namespace** `* as ns`),
   propagated **multi-hop** by a fixpoint; sanitizers respected. Not tracked (false negatives): re-exports
   (`export { x } from …`), default exports, CommonJS `require`/dynamic `import()`, bare/package imports,
-  chains deeper than ~7 hops in worst-case file order, methods, and destructured params. Python and Go are
-  intra-procedural (Go does not track multi-return assignments like `x, _ := f(src)`).
+  chains deeper than ~7 hops in worst-case file order, methods, and destructured params. **Python** is also
+  inter-procedural (return-taint + param→sink, intra-file and cross-file via resolved `from .mod import`/
+  `import mod`; not resolved: `import a.b` dotted-unaliased, `*`/re-exports, decorators). **Go** is
+  intra-procedural (no multi-return assignment tracking like `x, _ := f(src)`).
 - Config/secret rules are pattern-based where AST adds no value.
 - A high-signal gate and early-warning — **not a proof of security**. Pair it with Semgrep/CodeQL and review.
 

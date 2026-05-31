@@ -191,3 +191,12 @@ Independent validation (validator re-ran the harness **with network**):
 - **No over-claims:** README qualifies the 100% as the **curated** number and points to `docs/CORPUS.md` for the real-world measurement; still "not a Semgrep/CodeQL replacement; not a proof of security".
 
 QA (code-reviewer): **NEEDS-FIX → fixed** — **P1** protocol-relative bypass (`'/'+input`) closed + regression test; **P2** NodeGoat pinned by SHA; clone-failure recorded. Verdict: **VALIDATION: PASS**.
+
+
+## v0.7 — Python inter-procedural taint (validated)
+
+Adversarial self-QA (10 cases via `python3 src/python.py` over JSON; the code-reviewer subagent returned no output, so QA was self-performed and is recorded here in full) + the suite:
+- **True positives:** intra-file return-taint (`x = get_id(); cursor.execute(x)`), intra-file param→sink (`def run(q): cursor.execute(q)` + `run(req.args['x'])`), cross-file return-taint and param→sink (resolved `from mod import …`), and a **3-file 2-hop chain** — all fire VC-PY-SQLI at high confidence.
+- **True negatives (0 FP):** sanitizing helper (`return int(q)`), constant-returning helper, param→sink **called with a constant**, importing a same-named helper from the **safe** module (precise resolution), a **non-imported** bare name, an unrelated method `logger.run(req.x)`, and **recursion** (no hang) — all silent.
+- **No regression:** the original intra-procedural sinks still fire (CMDI/RCE/SQLI/DESERIALIZE verified); `bun test` 53/53; `bun benchmark/run.ts` 81 cases, precision/recall 100%, 0 FP.
+- **Honest FNs documented** (README/ADR-0009): `import a.b` dotted-unaliased, `*`/re-exports, decorator-mediated flow, instance methods.
