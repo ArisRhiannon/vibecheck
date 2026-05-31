@@ -6,7 +6,7 @@
 > classes AI coding agents get wrong (committed secrets, SQL injection via raw-query APIs, XSS, SSRF,
 > path traversal, command injection, insecure deserialization, weak JWT/CORS/cookies). Every finding is
 > confidence-ranked. Measured precision/recall on a labeled benchmark (see METRICS.md). Complements
-> Semgrep/CodeQL — not a replacement. (Python scanning needs python3 on PATH.)
+> Semgrep/CodeQL — not a replacement. (Python scanning needs python3; Go scanning needs a go toolchain; both on PATH. Python/Go are intra-procedural.)
 
 ## For agents
 - Run `vibecheck . --ci` before declaring a coding task done; fix all critical/high findings.

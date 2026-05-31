@@ -166,3 +166,16 @@ Verified with concrete snippets (`bun -e` against the public API) and the suite:
 - **Honest docs:** README/llms.txt/ADR-0006 state by-name + 1-hop, the ambiguity-skip, and the FN list (aliased/namespace/re-export imports, deep chains, methods, destructured params); still "not a Semgrep/CodeQL replacement".
 
 QA (code-reviewer): **NEEDS-FIX → fixed** (P1 cross-file name-collision FP eliminated via the ambiguity rule + regression test; P2 `.replace` and >4-hop tracked as known). Verdict: **VALIDATION: PASS**.
+
+
+## v0.5 — Go (third language) via go/parser (validated)
+
+An independent validator confirmed, with its own Go snippets and the running tool:
+- **Real parser:** `src/go.go` uses `go/parser` + `go/ast` (no regex); `src/go.ts` passes content as JSON over stdin and compiles the analyzer once to a binary cached by source SHA-256.
+- **Taint TP:** exec.Command (VC-GO-CMDI), db.Query("…"+r.FormValue) (VC-GO-SQLI), os.Open (VC-GO-PATH), http.Redirect (VC-GO-OPEN-REDIRECT), http.Get (VC-GO-SSRF) — all correct rule + line + **high** confidence.
+- **TN / 0 FP:** parameterized `db.Query("…$1", r.FormValue(…))` (QA P1 fix — only the query string is checked), `strconv.Atoi` sanitize, fixed `exec.Command`, non-DB receivers (`redis.Query`/`foo.Exec`), `client.Do(req)` (QA P2 — `.Do` dropped), gin `c.Query` vs db.Query — **0 false positives**.
+- **Graceful without go:** `goFindings` returns `[]` (no throw) when `go` is absent; JS/TS/Python unaffected. Confirmed by code + a no-go run.
+- **No regression:** Go commits only ADD files (core analyze2/taint/engine untouched); `bun test` 46/46; `bun benchmark/run.ts` 77 cases, precision/recall 100%, 0 FP. CI pins Go via `actions/setup-go`.
+- **Honest:** README/llms.txt/ADR-0007 state Go needs a `go` toolchain, intra-procedural, multi-return FN, `.Do` dropped; "not a Semgrep/CodeQL replacement".
+
+QA (code-reviewer): **NEEDS-FIX → fixed** (P1 parameterized-bind-param FP; P2 `.Do` SSRF FP; P3 doc). Verdict: **VALIDATION: PASS**.
