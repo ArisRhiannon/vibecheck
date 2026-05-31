@@ -1,9 +1,10 @@
 # vibecheck
 
-> Offline, zero-dependency, no-AI "safe to ship?" gate for vibe-coded apps. Detects the security and
-> config mistakes AI coding agents commonly make (committed secrets, unprotected routes, eval-RCE, SQL
-> injection, permissive CORS, weak JWT, insecure cookies, leaked NEXT_PUBLIC/Supabase keys, missing
-> input validation). Runs as a CLI, a library, or an MCP server. No network, no telemetry.
+> Agent-native "safe to ship?" gate for vibe-coded apps. Parses JS/TS/JSX/TSX with a real AST (Babel)
+> and uses intra-procedural taint analysis to flag the security classes AI coding agents get wrong
+> (committed secrets, SQL injection via raw-query APIs, XSS, SSRF, path traversal, command injection,
+> weak JWT/CORS/cookies). Every finding is confidence-ranked. Measured precision/recall on a labeled
+> benchmark (see METRICS.md). Complements Semgrep/CodeQL — not a replacement.
 
 ## For agents
 - Run `vibecheck . --ci` before declaring a coding task done; fix all critical/high findings.

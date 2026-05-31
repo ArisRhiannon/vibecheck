@@ -24,6 +24,9 @@ Or over MCP (stdio): start `vibecheck mcp` and call the `scan` tool with `{ "dir
    meant to be public, or add an auth check.
 
 ## Honesty
-vibecheck uses heuristics, not a full taint engine. It catches the common, high-frequency mistakes in
-AI-generated apps; it is a strong gate, not a proof of security. Do not suppress findings you have not
-actually fixed — use `.vibecheck.json` `ignoreRules`/`allowPaths` only for genuine false positives.
+vibecheck parses a real AST and runs intra-procedural taint analysis; findings are confidence-ranked
+(`high` = a user-input source provably reaches the sink). It is a strong, low-false-positive gate for
+the AI-vibe-coding failure classes — **not** a proof of security and **not** a replacement for
+Semgrep/CodeQL (run those too for breadth). Fix every `high`-confidence finding; treat `review` as a
+prompt to check, not a guaranteed bug. Use `.vibecheck.json` `ignoreRules`/`allowPaths` only for genuine
+false positives, never to hide an unfixed issue.

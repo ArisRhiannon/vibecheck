@@ -1,6 +1,6 @@
 # ADR-0001: Heuristic, zero-dependency, no-AI source scanning
 
-**Status**: Accepted · **Date**: 2026-05-31 · **Decider**: Aris Rhiannon
+**Status**: Superseded by ADR-0003 (v0.2) · **Date**: 2026-05-31 · **Decider**: Aris Rhiannon
 
 ## Context
 vibecheck must catch the security mistakes AI-generated apps make, run anywhere (incl. CI and agent

@@ -2,6 +2,11 @@
 
 Role: CEO. Author: Aris Rhiannon. Status: accepted.
 
+> **v0.2 update:** this v0.1 vision called for "zero-dependency / offline / no-AI". After review, those
+> were repositioned (zero-dep was a precision handicap). Current architecture and positioning live in
+> `docs/REARCHITECTURE.md` — vibecheck now uses a real AST (`@babel`) + intra-procedural taint and
+> publishes measured precision/recall. This file is kept for history.
+
 ## One-liner
 `vibecheck` — a zero-dependency, **offline, no-AI** "is this safe to ship?" gate for vibe-coded apps.
 It finds the *specific* mistakes AI coding agents make (unprotected routes, committed secrets, eval-RCE,
