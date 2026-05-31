@@ -200,3 +200,14 @@ Adversarial self-QA (10 cases via `python3 src/python.py` over JSON; the code-re
 - **True negatives (0 FP):** sanitizing helper (`return int(q)`), constant-returning helper, param→sink **called with a constant**, importing a same-named helper from the **safe** module (precise resolution), a **non-imported** bare name, an unrelated method `logger.run(req.x)`, and **recursion** (no hang) — all silent.
 - **No regression:** the original intra-procedural sinks still fire (CMDI/RCE/SQLI/DESERIALIZE verified); `bun test` 53/53; `bun benchmark/run.ts` 81 cases, precision/recall 100%, 0 FP.
 - **Honest FNs documented** (README/ADR-0009): `import a.b` dotted-unaliased, `*`/re-exports, decorator-mediated flow, instance methods.
+
+
+## v0.8 — Go inter-procedural (intra-package) taint (validated)
+
+Adversarial self-QA (7 cases via the compiled analyzer over JSON) + the suite:
+- **True positives:** intra-package return-taint (`q := getInput(r); db.Query(q)`), param→sink (`func run(q){ db.Query(q) }` + `run(r.FormValue("x"))`), passthrough-return helper, and **multi-file same-package** flow — all fire VC-GO-SQLI at high confidence.
+- **True negatives (0 FP):** a helper that **parameterizes** (`db.Query("$1", s)`), a **cross-package** `pkg.Func(taint)` (unresolved → silent, an honest FN), an unrelated method `logger.Run(taint)`, **recursion** (no hang), and a **same-named function in a different package** (keyed by package → no contamination) — all silent.
+- **No regression:** original direct Go sinks still fire; `bun test` 54/54; `bun benchmark/run.ts` 84 cases, precision/recall 100%, 0 FP.
+- **Honest FNs documented** (README/ADR-0010): cross-package `pkg.Func`, multi-return assignments.
+
+All three languages are now inter-procedural (JS/TS cross-file with module resolution; Python intra+cross-file by import; Go intra-package).

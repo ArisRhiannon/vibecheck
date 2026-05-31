@@ -28,4 +28,15 @@ func h(){ exec.Command("ls", "-la") }`, "VC-GO-CMDI")).toBe(false);
     expect(run(`package main
 func h(r *http.Request){ os.Open(r.FormValue("f")) }`)[0]?.confidence).toBe("high");
   });
+  test("inter-procedural: return-taint and param→sink helpers (intra-package)", () => {
+    expect(has(`package main
+func getInput(r *http.Request) string { return r.FormValue("x") }
+func h(r *http.Request){ db.Query(getInput(r)) }`, "VC-GO-SQLI")).toBe(true);
+    expect(has(`package main
+func run(q string){ db.Query(q) }
+func h(r *http.Request){ run(r.FormValue("x")) }`, "VC-GO-SQLI")).toBe(true);
+    expect(run(`package main
+func run(q string){ db.Query(q) }
+func h(){ run("SELECT 1") }`).length).toBe(0);
+  });
 });

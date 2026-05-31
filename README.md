@@ -5,7 +5,7 @@
 
 A fast, **agent-native** "safe to ship?" gate for vibe-coded apps. It parses your **JS/TS/JSX/TSX**
 (`@babel/parser`), **Python** (the stdlib `ast`), and **Go** (`go/parser`) with **real parsers** and uses **taint analysis**
-(inter-procedural for JS/TS and Python — return-taint + param→sink summaries, within a file and across files) to flag the security classes AI coding agents get wrong — committed secrets, SQL
+(inter-procedural for JS/TS, Python, and Go — return-taint + param→sink summaries, within a file and across files) to flag the security classes AI coding agents get wrong — committed secrets, SQL
 injection through *abstracted* raw-query APIs, XSS, SSRF, path traversal, command injection, insecure
 deserialization, weak JWT/CORS/cookies — and ranks every finding by **confidence** so an agent can fix
 the real ones and ignore the noise.
@@ -99,7 +99,8 @@ Taint-backed: `VC-RCE-EVAL`, `VC-RCE-CHILD-PROCESS`, `VC-SQLI`, `VC-XSS-REACT`, 
   chains deeper than ~7 hops in worst-case file order, methods, and destructured params. **Python** is also
   inter-procedural (return-taint + param→sink, intra-file and cross-file via resolved `from .mod import`/
   `import mod`; not resolved: `import a.b` dotted-unaliased, `*`/re-exports, decorators). **Go** is
-  intra-procedural (no multi-return assignment tracking like `x, _ := f(src)`).
+  inter-procedural **within a package** (return-taint + param→sink, same-package by function name);
+  cross-package `pkg.Func` calls and multi-return assignments (`x, _ := f(src)`) are not tracked.
 - Config/secret rules are pattern-based where AST adds no value.
 - A high-signal gate and early-warning — **not a proof of security**. Pair it with Semgrep/CodeQL and review.
 

@@ -103,4 +103,13 @@ func h(r *http.Request){ id, _ := strconv.Atoi(r.FormValue("id")); db.Query("SEL
 func h(){ exec.Command("ls", "-la") }`, expect: [] },
   { name: "go-safe-param-raw", rel: "a.go", code: `package main
 func h(r *http.Request){ db.Query("SELECT * FROM u WHERE id = $1", r.FormValue("id")) }`, expect: [] },
+  { name: "go-ret-helper", rel: "a.go", code: `package main
+func getInput(r *http.Request) string { return r.FormValue("x") }
+func h(r *http.Request){ db.Query(getInput(r)) }`, expect: ["VC-GO-SQLI"] },
+  { name: "go-paramsink-helper", rel: "a.go", code: `package main
+func run(q string){ db.Query(q) }
+func h(r *http.Request){ run(r.FormValue("x")) }`, expect: ["VC-GO-SQLI"] },
+  { name: "go-safe-paramsink-const", rel: "a.go", code: `package main
+func run(q string){ db.Query(q) }
+func h(){ run("SELECT 1") }`, expect: [] },
 ];
