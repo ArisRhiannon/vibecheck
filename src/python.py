@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """vibecheck Python analyzer: real `ast` parsing + inter-procedural taint (return-taint + param->sink,
 intra-file and cross-file by resolved import). Reads [{path,content}] on stdin -> JSON findings on stdout."""
-import ast, json, sys
+import ast, json, sys, re
 
 def dotted(node):
     if isinstance(node, ast.Name): return node.id
@@ -12,20 +12,29 @@ def dotted(node):
     if isinstance(node, ast.Subscript): return dotted(node.value)
     return None
 
-REQ_ATTRS = {"args", "form", "values", "json", "data", "cookies", "files", "headers", "GET", "POST", "body", "query_params", "params"}
-SOURCE_CALLS = {"input", "request.get_json", "request.args.get", "request.form.get", "request.values.get",
-                "request.cookies.get", "request.headers.get", "request.json.get", "self.get_argument"}
+# Request attributes that carry attacker input across web frameworks (Flask/Django/aiohttp/Starlette/
+# FastAPI/Bottle/Pyramid/Tornado). Matched on a `request.`/`req.` chain (also `self.request.`).
+REQ_ATTRS = ["args", "form", "forms", "values", "json", "data", "cookies", "COOKIES", "files", "FILES",
+             "headers", "GET", "POST", "body", "query", "query_params", "params", "match_info", "matchdict",
+             "path_params", "rel_url", "META", "json_body", "arguments"]
+REQ_RE = re.compile(r"(?:^|\.)(?:request|req)\.(?:" + "|".join(map(re.escape, REQ_ATTRS)) + r")(?:$|\.|\[)")
+# Call-form sources (often awaited): aiohttp/Starlette `request.post()/json()/text()/...`, `.get()` on a
+# request multidict, Tornado `self.get_argument(...)`, builtin input().
+SOURCE_CALL_SUFFIXES = ("request.post", "request.json", "request.text", "request.read", "request.form",
+                        "request.body", "request.get_json", "request.query.get", "request.match_info.get",
+                        "request.params.get", "request.matchdict.get", "req.post", "req.json", "req.form",
+                        ".get_argument", ".get_query_argument", ".get_body_argument", "request.args.get",
+                        "request.form.get", "request.values.get", "request.cookies.get", "request.headers.get")
 
 def is_source(node):
     if isinstance(node, (ast.Attribute, ast.Subscript)):
-        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id == "request" and node.attr in REQ_ATTRS:
-            return True
         d = dotted(node)
-        if d and (d == "sys.argv" or d.startswith("request.") and any(f".{a}" in d or d.endswith(a) for a in REQ_ATTRS)):
+        if d and (d == "sys.argv" or REQ_RE.search("." + d)):
             return True
-        return is_source(node.value) if isinstance(node, (ast.Attribute, ast.Subscript)) else False
+        return is_source(node.value)
     if isinstance(node, ast.Call):
-        return dotted(node) in SOURCE_CALLS
+        d = dotted(node) or ""
+        return d == "input" or any(d == s or d.endswith(s) for s in SOURCE_CALL_SUFFIXES)
     return False
 
 NUMERIC = {"int", "float", "bool", "len", "abs"}
@@ -33,6 +42,8 @@ NUMERIC = {"int", "float", "bool", "len", "abs"}
 def is_tainted(node, tset):
     if node is None: return False
     if isinstance(node, ast.Name): return node.id in tset
+    if isinstance(node, ast.Await): return is_tainted(node.value, tset)
+    if isinstance(node, ast.Dict): return any(is_tainted(v, tset) for v in node.values if v is not None)
     if isinstance(node, (ast.Attribute, ast.Subscript)):
         return is_source(node) or is_tainted(node.value, tset)
     if isinstance(node, ast.BinOp):
@@ -176,13 +187,16 @@ def imports_of(tree, modrel, relset):
                 if target: mods[al.asname or al.name.split(".")[0]] = target
     return named, mods
 
-def make_resolver(modrel, named, mods, localfns):
+def make_resolver(modrel, named, mods, localfns, localclasses):
     def res(callee):
         if isinstance(callee, ast.Name):
             if callee.id in named: return named[callee.id]
             if callee.id in localfns: return (modrel, callee.id)
         elif isinstance(callee, ast.Attribute) and isinstance(callee.value, ast.Name):
-            if callee.value.id in mods: return (mods[callee.value.id], callee.attr)
+            x = callee.value.id
+            if x in mods: return (mods[x], callee.attr)          # imported module: mod.func
+            if x in named: return (named[x][0], callee.attr)      # imported Class: Class.method -> its module
+            if x in localclasses: return (modrel, callee.attr)    # local Class.staticmethod
         return None
     return res
 
@@ -292,7 +306,8 @@ if __name__ == "__main__":
     for rel, tree in mods.items():
         fdata[rel] = build_fdata(tree)
         named, modsmap = imports_of(tree, rel, relset)
-        resolvers[rel] = make_resolver(rel, named, modsmap, set(fdata[rel].keys()))
+        localclasses = {n.name for n in ast.walk(tree) if isinstance(n, ast.ClassDef)}
+        resolvers[rel] = make_resolver(rel, named, modsmap, set(fdata[rel].keys()), localclasses)
     summaries = build_summaries(fdata, resolvers)
     findings = []
     for rel, tree in mods.items():
