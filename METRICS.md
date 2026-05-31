@@ -1,11 +1,11 @@
 # Benchmark metrics
 
-Corpus: **62** labeled cases (vulnerable + safe + tricky-safe). Advisory rules
+Corpus: **66** labeled cases (vulnerable + safe + tricky-safe). Advisory rules
 (`VC-ROUTE-NO-AUTH`, `VC-INPUT-NO-VALIDATION`) and `review`-confidence findings are excluded
 from these core numbers by design (they are advisory, not assertions). Re-run: `bun benchmark/run.ts`.
 
-- **Precision: 100.0%** (TP 36 / FP 0)
-- **Recall: 100.0%** (TP 36 / FN 0)
+- **Precision: 100.0%** (TP 38 / FP 0)
+- **Recall: 100.0%** (TP 38 / FN 0)
 - **F1: 100.0%**
 
 | rule | TP | FP | FN |
@@ -27,8 +27,8 @@ from these core numbers by design (they are advisory, not assertions). Re-run: `
 | VC-PY-YAML | 1 | 0 | 0 |
 | VC-RCE-CHILD-PROCESS | 2 | 0 | 0 |
 | VC-RCE-EVAL | 3 | 0 | 0 |
-| VC-SQLI | 5 | 0 | 0 |
-| VC-SSRF | 2 | 0 | 0 |
+| VC-SQLI | 6 | 0 | 0 |
+| VC-SSRF | 3 | 0 | 0 |
 | VC-STACK-EXPOSURE | 1 | 0 | 0 |
 | VC-SUPABASE-SERVICE-ROLE | 1 | 0 | 0 |
 | VC-XSS-DOM | 3 | 0 | 0 |

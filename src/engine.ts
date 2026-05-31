@@ -4,6 +4,7 @@ import { envFindings } from "./envcheck";
 import { astFindings } from "./analyze2";
 import { miscFindings } from "./misc";
 import { pythonFindings } from "./python";
+import { interprocFindings } from "./interproc";
 import { type Finding, type Severity, type Confidence, SEVERITY_ORDER, CONFIDENCE_ORDER } from "./types";
 import type { VibecheckConfig } from "./config";
 
@@ -33,7 +34,7 @@ export function countBySeverity(f: Finding[]): Record<Severity, number> {
 /** Scan a project directory with all detectors, honoring `.vibecheck.json`. */
 export function scanProject(dir: string, cfg: VibecheckConfig = {}): ScanResult {
   const files = collectFiles(dir);
-  const raw = [...secretFindings(files), ...envFindings(files), ...astFindings(files), ...miscFindings(files), ...pythonFindings(files)];
+  const raw = [...secretFindings(files), ...envFindings(files), ...astFindings(files), ...miscFindings(files), ...pythonFindings(files), ...interprocFindings(files)];
   const ignore = new Set(cfg.ignoreRules ?? []);
   const allow = (cfg.allowPaths ?? []).map(globToRe);
   const seen = new Set<string>();

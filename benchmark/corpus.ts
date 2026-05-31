@@ -73,4 +73,9 @@ export const CORPUS: Case[] = [
   { name: "py-safe-yaml", rel: "a.py", code: "def h():\n    return yaml.safe_load(blob)", expect: [] },
   { name: "py-tuple-unpack", rel: "a.py", code: "def h():\n    a, b = request.args['a'], 'ok'\n    os.system(a)", expect: ["VC-PY-CMDI"] },
   { name: "py-safe-tuple", rel: "a.py", code: "def h():\n    a, b = 'ok', request.args['b']\n    cursor.execute(a)", expect: [] },
+  // Inter-procedural (intra-file) via function summaries
+  { name: "ip-sqli-helper", rel: "a.ts", code: "function q(s){ db.query(s); }\nq(req.body.x);", expect: ["VC-SQLI"] },
+  { name: "ip-ssrf-helper", rel: "a.ts", code: "const call = (u) => { fetch(u); };\ncall(req.query.url);", expect: ["VC-SSRF"] },
+  { name: "ip-safe-helper-sanitized", rel: "a.ts", code: "function q(s){ s = Number(s); db.query(s); }\nq(req.body.x);", expect: [] },
+  { name: "ip-safe-helper-literal", rel: "a.ts", code: "function q(s){ db.query(s); }\nq('SELECT 1');", expect: [] },
 ];
