@@ -1,4 +1,5 @@
-import { traverse, t, type NodePath } from "./ast";
+import { traverse, t, parseFile, type NodePath } from "./ast";
+import { type SourceFile } from "./types";
 
 /** Dotted path for an identifier/member chain, or null. Computed members render as `[]`. */
 export function memberPath(node: t.Node): string | null {
@@ -94,7 +95,7 @@ function patternNames(node: t.Node | null): string[] {
 
 /** Per-function (and top-level) tainted variable sets. Last-write-wins (flow-insensitive within a
  *  scope, but a later sanitizing assignment removes taint), computed to a fixpoint. */
-export function buildTaintSets(file: t.File): Map<t.Node, Set<string>> {
+export function buildTaintSets(file: t.File, summaries?: Summaries): Map<t.Node, Set<string>> {
   const last = new Map<t.Node, Map<string, t.Node | null | undefined>>();
   const put = (scope: t.Node, name: string, expr: t.Node | null | undefined) => {
     const m = last.get(scope) ?? new Map();
@@ -118,7 +119,7 @@ export function buildTaintSets(file: t.File): Map<t.Node, Set<string>> {
     for (let i = 0; i < 6; i++) {
       let changed = false;
       for (const [name, expr] of m) {
-        const tainted = isTainted(expr, s);
+        const tainted = isTainted(expr, s) || (summaries ? returnTainted(expr, s, summaries) : false);
         if (tainted && !s.has(name)) { s.add(name); changed = true; }
         else if (!tainted && s.has(name)) { s.delete(name); changed = true; }
       }
@@ -132,4 +133,121 @@ export function buildTaintSets(file: t.File): Map<t.Node, Set<string>> {
 export function taintedAt(path: NodePath, node: t.Node, file: t.File, sets: Map<t.Node, Set<string>>): boolean {
   const scope = path.getFunctionParent()?.node ?? file.program;
   return isTainted(node, sets.get(scope) ?? new Set());
+}
+
+
+/** Summary of a function's return-taint behavior (for inter-procedural data-flow). */
+export interface FnSummary { params: (string | null)[]; returnsAbsolute: boolean; returnParams: Set<number>; }
+export type Summaries = Map<string, FnSummary>;
+
+function paramOf(p: t.Node): string | null {
+  if (t.isIdentifier(p)) return p.name;
+  if (t.isAssignmentPattern(p) && t.isIdentifier(p.left)) return p.left.name;
+  return null;
+}
+
+/** Does this expression return attacker-controlled data via a known function summary? */
+export function returnTainted(node: t.Node | null | undefined, set: Set<string>, summaries: Summaries): boolean {
+  if (!node) return false;
+  if (t.isAwaitExpression(node)) return returnTainted(node.argument, set, summaries);
+  if ((t.isCallExpression(node) || t.isOptionalCallExpression(node)) && t.isIdentifier(node.callee)) {
+    const s = summaries.get(node.callee.name);
+    if (!s) return false;
+    if (s.returnsAbsolute) return true;
+    return [...s.returnParams].some((i) => {
+      const a = node.arguments[i] as t.Node | undefined;
+      return !!a && (isTainted(a, set) || returnTainted(a, set, summaries));
+    });
+  }
+  return false;
+}
+
+/** Build per-function return-taint summaries (fixpoint over the file; `base` seeds cross-file names). */
+export function buildSummaries(file: t.File, base?: Summaries): Summaries {
+  const fns = new Map<string, { node: t.Function; params: (string | null)[] }>();
+  const assigns = new Map<t.Node, Array<{ names: string[]; expr: t.Node | null | undefined }>>();
+  const returns = new Map<t.Node, Array<t.Node | null | undefined>>();
+  const push = <V>(m: Map<t.Node, V[]>, k: t.Node, v: V) => m.set(k, [...(m.get(k) ?? []), v]);
+  traverse(file, {
+    Function(path) {
+      let name: string | null = null;
+      if (t.isFunctionDeclaration(path.node) && path.node.id) name = path.node.id.name;
+      else if (path.parentPath?.isVariableDeclarator() && t.isIdentifier(path.parentPath.node.id)) name = path.parentPath.node.id.name;
+      if (name) fns.set(name, { node: path.node, params: path.node.params.map((p) => paramOf(p as t.Node)) });
+      if (t.isArrowFunctionExpression(path.node) && !t.isBlockStatement(path.node.body)) push(returns, path.node, path.node.body);
+    },
+    VariableDeclarator(path) {
+      const fn = path.getFunctionParent()?.node;
+      if (fn && t.isIdentifier(path.node.id)) push(assigns, fn, { names: [path.node.id.name], expr: path.node.init });
+    },
+    AssignmentExpression(path) {
+      const fn = path.getFunctionParent()?.node;
+      if (fn && path.node.operator === "=" && t.isIdentifier(path.node.left)) push(assigns, fn, { names: [path.node.left.name], expr: path.node.right });
+    },
+    ReturnStatement(path) {
+      const fn = path.getFunctionParent()?.node;
+      if (fn) push(returns, fn, path.node.argument);
+    },
+  });
+  const sum: Summaries = new Map(base ?? []);
+  const fix = (la: Array<{ names: string[]; expr: t.Node | null | undefined }>, seed: Set<string>): Set<string> => {
+    const s = new Set(seed);
+    for (let k = 0; k < 6; k++) {
+      let ch = false;
+      for (const { names, expr } of la) {
+        const tt = isTainted(expr, s) || returnTainted(expr, s, sum);
+        for (const n of names) { if (tt && !s.has(n)) { s.add(n); ch = true; } else if (!tt && s.has(n)) { s.delete(n); ch = true; } }
+      }
+      if (!ch) break;
+    }
+    return s;
+  };
+  for (let iter = 0; iter < 4; iter++) {
+    let changed = false;
+    for (const [name, fn] of fns) {
+      const la = assigns.get(fn.node) ?? [];
+      const rs = returns.get(fn.node) ?? [];
+      const taintedRet = (s: Set<string>) => rs.some((r) => isTainted(r, s) || returnTainted(r, s, sum));
+      const returnsAbsolute = taintedRet(fix(la, new Set()));
+      const returnParams = new Set<number>();
+      fn.params.forEach((pn, i) => { if (pn && taintedRet(fix(la, new Set([pn])))) returnParams.add(i); });
+      const prev = sum.get(name);
+      if (!prev || prev.returnsAbsolute !== returnsAbsolute || prev.returnParams.size !== returnParams.size) changed = true;
+      sum.set(name, { params: fn.params, returnsAbsolute, returnParams });
+    }
+    if (!changed) break;
+  }
+  return sum;
+}
+
+
+const JS_SUM = /\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
+function importedNames(file: t.File): Set<string> {
+  const names = new Set<string>();
+  traverse(file, { ImportDeclaration(path) { for (const sp of path.node.specifiers) names.add(sp.local.name); } });
+  return names;
+}
+
+/** Per-file return-taint summaries with cross-file resolution: a function's summary is visible to other
+ *  files that import it by name (1-hop, by-name; no full module resolution). */
+export function crossFileSummaries(files: SourceFile[]): Map<string, Summaries> {
+  const parsed = new Map<string, t.File>();
+  const local = new Map<string, Summaries>();
+  const global: Summaries = new Map();
+  for (const f of files) {
+    if (!JS_SUM.test(f.rel)) continue;
+    const ast = parseFile(f.content, f.rel);
+    if (!ast) continue;
+    parsed.set(f.rel, ast);
+    const s = buildSummaries(ast);
+    local.set(f.rel, s);
+    for (const [n, sm] of s) if (!global.has(n)) global.set(n, sm);
+  }
+  const out = new Map<string, Summaries>();
+  for (const [rel, ast] of parsed) {
+    const base: Summaries = new Map(local.get(rel));
+    for (const n of importedNames(ast)) { const g = global.get(n); if (g && !base.has(n)) base.set(n, g); }
+    out.set(rel, buildSummaries(ast, base));
+  }
+  return out;
 }
