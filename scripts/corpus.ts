@@ -11,7 +11,11 @@ const REPOS = [
   { name: "fastify/fastify", url: "https://github.com/fastify/fastify.git", ref: "v4.28.1", kind: "JS/TS — mature web framework" },
   { name: "OWASP/NodeGoat", url: "https://github.com/OWASP/NodeGoat.git", ref: "c5cb68a7084e4ae7dcc60e6a98768720a81841e8", kind: "JS — intentionally vulnerable app" },
   { name: "pallets/flask", url: "https://github.com/pallets/flask.git", ref: "3.0.3", kind: "Python — mature web framework" },
+  { name: "pallets/werkzeug", url: "https://github.com/pallets/werkzeug.git", ref: "3.0.3", kind: "Python — mature WSGI toolkit" },
+  { name: "psf/requests", url: "https://github.com/psf/requests.git", ref: "v2.32.3", kind: "Python — mature HTTP library" },
+  { name: "anxolerd/dvpwa", url: "https://github.com/anxolerd/dvpwa.git", ref: "master", kind: "Python — intentionally vulnerable app" },
   { name: "gin-gonic/gin", url: "https://github.com/gin-gonic/gin.git", ref: "v1.10.0", kind: "Go — mature web framework" },
+  { name: "gorilla/mux", url: "https://github.com/gorilla/mux.git", ref: "v1.8.1", kind: "Go — mature router" },
 ];
 const WORK = join(process.env.TMPDIR ?? "/tmp", "vibecheck-corpus");
 
@@ -40,11 +44,13 @@ for (const r of REPOS) {
   const { findings } = scanProject(dir);
   const ms = Date.now() - t0;
   const high = findings.filter((f) => f.confidence === "high");
+  const conf = { high: 0, medium: 0, review: 0 } as Record<string, number>;
+  for (const f of findings) conf[f.confidence] = (conf[f.confidence] ?? 0) + 1;
   const perRule: Record<string, number> = {};
   for (const f of high) perRule[f.ruleId] = (perRule[f.ruleId] ?? 0) + 1;
-  report.push({ name: r.name, kind: r.kind, ref: r.ref, sha, files: files.length, ms, high: high.length, perRule,
+  report.push({ name: r.name, kind: r.kind, ref: r.ref, sha, files: files.length, ms, conf, high: high.length, perRule,
     findings: high.map((f) => ({ rule: f.ruleId, sev: f.severity, file: f.file, line: f.line, snippet: f.snippet })) });
-  console.log(`${r.name.padEnd(20)} @ ${sha.slice(0, 10)} | files=${String(files.length).padStart(5)} | ${String(ms).padStart(6)}ms | high=${String(high.length).padStart(3)} ${JSON.stringify(perRule)}`);
+  console.log(`${r.name.padEnd(20)} @ ${sha.slice(0, 10)} | files=${String(files.length).padStart(5)} | ${String(ms).padStart(6)}ms | high=${String(high.length).padStart(3)} med=${String(conf.medium).padStart(3)} rev=${String(conf.review).padStart(3)} ${JSON.stringify(perRule)}`);
 }
 writeFileSync(join(WORK, "corpus-raw.json"), JSON.stringify(report, null, 2));
 console.log(`\nRaw high-confidence findings → ${join(WORK, "corpus-raw.json")}`);

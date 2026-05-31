@@ -211,3 +211,15 @@ Adversarial self-QA (7 cases via the compiled analyzer over JSON) + the suite:
 - **Honest FNs documented** (README/ADR-0010): cross-package `pkg.Func`, multi-return assignments.
 
 All three languages are now inter-procedural (JS/TS cross-file with module resolution; Python intra+cross-file by import; Go intra-package).
+
+
+## v0.9 — Expanded real-world corpus (9 repos, 833 files) + corpus-driven SSRF fix (validated)
+
+Reproduced with `bun scripts/corpus.ts` (network) + full triage:
+- **9 pinned repos, 833 files**, three languages, mature + intentionally-vulnerable mix. Per-confidence breakdown recorded.
+- **6 high-confidence findings, fully triaged:** 4 real production vulns (NodeGoat RCE×3 + open redirect), 2 correct detections in test code / a test `.env` fixture; **0 detector false positives**.
+- **The corpus found and fixed a real FP class:** werkzeug's `debug/.../debugger.js` does `fetch(\`${document.location}…\`)` — client-side, flagged as SSRF. Fixed: VC-SSRF now requires a **server** source (`req/request/ctx/event.*`, request call, or tainted variable), not a DOM `location`; werkzeug high → 0. Server SSRF (direct + via variable) still fires (benchmark + tests).
+- **Honest FN exposed:** `anxolerd/dvpwa` (intentionally-vulnerable Python) produced 0 high / 7 medium because it uses **aiohttp** request APIs we don't model as sources (we model Flask/Django `request.*`, gin, `net/http`) — documented in CORPUS.md as future work. Exactly the gap a curated benchmark hides.
+- **No regression:** `bun test` 56/56; `bun benchmark/run.ts` 86 cases, precision/recall 100%, 0 FP.
+
+QA: the code-reviewer subagent was unavailable; the SSRF fix was QA'd via adversarial self-test (client `document.location`/`location` silent; server direct + via-var fire) and the full triage above is recorded for scrutiny.

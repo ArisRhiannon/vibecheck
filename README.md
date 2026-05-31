@@ -39,7 +39,7 @@ pre-flight** that won't drown an agent in false positives.
 
 ## Measured quality (not claimed)
 
-Against a labeled benchmark of **77 cases** across JS/TS, Python **and** Go (vulnerable + safe + deliberately
+Against a labeled benchmark of **86 cases** across JS/TS, Python **and** Go (vulnerable + safe + deliberately
 tricky-safe), the core detectors score (see [`METRICS.md`](METRICS.md), reproduce with `bun benchmark/run.ts`):
 
 - **Precision 100%**, **Recall 100%**, **F1 100%** on the corpus.
@@ -47,9 +47,9 @@ tricky-safe), the core detectors score (see [`METRICS.md`](METRICS.md), reproduc
 The tricky-safe cases that produce **zero false positives** include: parameterized queries, tagged-
 template SQL, numeric-coerced and schema-validated input, ORM/RegExp `.exec()`, Supabase **anon** /
 Stripe **publishable** keys, hardened cookies, allow-listed CORS, and pinned JWT algorithms — exactly
-the patterns a regex linter trips on. This benchmark is curated; for a **real-world** measurement (pinned
-OSS repos, manually triaged), see [`docs/CORPUS.md`](docs/CORPUS.md) — which also drove a precision fix
-(fixed-prefix relative redirects are no longer flagged).
+the patterns a regex linter trips on. This benchmark is curated; for a **real-world** measurement (9 pinned
+OSS repos, 833 files, manually triaged), see [`docs/CORPUS.md`](docs/CORPUS.md) — which drove two precision
+fixes (fixed-prefix relative redirects, and SSRF requiring a server source not client-side `location`).
 
 ## Confidence (the anti-false-positive-loop design)
 
