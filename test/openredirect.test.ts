@@ -11,5 +11,6 @@ describe("open-redirect: relative vs host-controlled (corpus-driven)", () => {
   });
   test("a fully attacker-controlled redirect target IS flagged", () => {
     expect(has("res.redirect(req.query.url);", "VC-OPEN-REDIRECT")).toBe(true);
+    expect(has("res.redirect('/' + req.query.x);", "VC-OPEN-REDIRECT")).toBe(true);
   });
 });

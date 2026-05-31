@@ -17,7 +17,7 @@ open-source repositories at pinned commits. This is an **honest, manually-triage
 |--|--|--|--|--|--|
 | expressjs/express @ 4.21.2 | JS — mature framework | `1faf228935` | 191 | ~1.4 s | 1 |
 | fastify/fastify @ v4.28.1 | JS/TS — mature framework | `94068edf59` | 355 | ~6.5 s | 0 |
-| OWASP/NodeGoat @ master | JS — intentionally vulnerable | `c5cb68a708` | 92 | ~1.8 s | 4 |
+| OWASP/NodeGoat @ `c5cb68a7` | JS — intentionally vulnerable | `c5cb68a708` | 92 | ~1.8 s | 4 |
 | pallets/flask @ 3.0.3 | Python — mature framework | `c12a5d874c` | 62 | ~6 ms | 1 |
 | gin-gonic/gin @ v1.10.0 | Go — mature framework | `75ccf94d60` | 18 | ~8 ms | 0 |
 
@@ -40,7 +40,9 @@ The initial run also flagged `examples/mvc/.../index.js:21` `res.redirect('/user
 That is a **fixed-prefix relative redirect** (`/user/...`) — it cannot leave the site, so it is **not** an
 open redirect. This was a real precision bug. Fix: the open-redirect rule now suppresses targets whose
 leading literal is a relative path (`/…` but not `//…`); added unit tests + a benchmark case. The
-attacker-controlled NodeGoat case (`req.query.url`, no fixed prefix) still fires.
+attacker-controlled NodeGoat case (`req.query.url`, no fixed prefix) still fires. The relative check
+requires a `/` followed by a **non-slash**, so a bare `'/' + input` (which could become `//evil.com`,
+a protocol-relative redirect) is still flagged — verified by test.
 
 ## Results (honest, two lenses)
 - **Detector precision (after the fix): 6/6 = 100%** — every remaining high-confidence finding correctly

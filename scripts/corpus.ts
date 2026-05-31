@@ -9,7 +9,7 @@ import { collectFiles } from "../src/walk";
 const REPOS = [
   { name: "expressjs/express", url: "https://github.com/expressjs/express.git", ref: "4.21.2", kind: "JS — mature web framework" },
   { name: "fastify/fastify", url: "https://github.com/fastify/fastify.git", ref: "v4.28.1", kind: "JS/TS — mature web framework" },
-  { name: "OWASP/NodeGoat", url: "https://github.com/OWASP/NodeGoat.git", ref: "master", kind: "JS — intentionally vulnerable app" },
+  { name: "OWASP/NodeGoat", url: "https://github.com/OWASP/NodeGoat.git", ref: "c5cb68a7084e4ae7dcc60e6a98768720a81841e8", kind: "JS — intentionally vulnerable app" },
   { name: "pallets/flask", url: "https://github.com/pallets/flask.git", ref: "3.0.3", kind: "Python — mature web framework" },
   { name: "gin-gonic/gin", url: "https://github.com/gin-gonic/gin.git", ref: "v1.10.0", kind: "Go — mature web framework" },
 ];
@@ -17,7 +17,15 @@ const WORK = join(process.env.TMPDIR ?? "/tmp", "vibecheck-corpus");
 
 function clone(url: string, ref: string, dir: string): string {
   rmSync(dir, { recursive: true, force: true });
-  execFileSync("git", ["clone", "--depth", "1", "--branch", ref, url, dir], { stdio: "ignore" });
+  if (/^[0-9a-f]{40}$/.test(ref)) {
+    mkdirSync(dir, { recursive: true });
+    execFileSync("git", ["-C", dir, "init", "-q"]);
+    execFileSync("git", ["-C", dir, "remote", "add", "origin", url]);
+    execFileSync("git", ["-C", dir, "fetch", "-q", "--depth", "1", "origin", ref]);
+    execFileSync("git", ["-C", dir, "checkout", "-q", "FETCH_HEAD"]);
+  } else {
+    execFileSync("git", ["clone", "--depth", "1", "--branch", ref, url, dir], { stdio: "ignore" });
+  }
   return execFileSync("git", ["-C", dir, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 }
 
@@ -26,7 +34,7 @@ const report: unknown[] = [];
 for (const r of REPOS) {
   const dir = join(WORK, r.name.replace("/", "__"));
   let sha = "";
-  try { sha = clone(r.url, r.ref, dir); } catch (e) { console.error(`clone FAILED ${r.name}: ${String(e)}`); continue; }
+  try { sha = clone(r.url, r.ref, dir); } catch (e) { console.error(`clone FAILED ${r.name}: ${String(e)}`); report.push({ name: r.name, kind: r.kind, ref: r.ref, error: String(e) }); continue; }
   const files = collectFiles(dir);
   const t0 = Date.now();
   const { findings } = scanProject(dir);

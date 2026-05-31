@@ -19,10 +19,11 @@ function leadingLiteral(node: t.Node): string | null {
   if (t.isBinaryExpression(node) && node.operator === "+") return leadingLiteral(node.left as t.Node);
   return null;
 }
-/** A redirect target that starts with a fixed "/path" (not "//host") stays same-site → not an open redirect. */
+/** A redirect target that starts with a fixed "/x…" path stays same-site → not an open redirect.
+ *  Note: a bare "/" (so `'/' + input` can become `//evil.com`) or "//host" is NOT treated as relative. */
 function isRelativeRedirect(node: t.Node): boolean {
   const p = leadingLiteral(node);
-  return p !== null && p.startsWith("/") && !p.startsWith("//");
+  return p !== null && /^\/[^/]/.test(p);
 }
 
 /** Find an object-expression argument and return a property's value node by key, if present. */
