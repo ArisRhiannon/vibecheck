@@ -43,12 +43,16 @@ def is_tainted(node, tset):
         return is_tainted(node.body, tset) or is_tainted(node.orelse, tset)
     if isinstance(node, ast.BoolOp):
         return any(is_tainted(v, tset) for v in node.values)
+    if isinstance(node, (ast.Tuple, ast.List)):
+        return any(is_tainted(e, tset) for e in node.elts)
     if isinstance(node, ast.Call):
         if is_source(node): return True
         d = dotted(node)
         if d in NUMERIC: return False
         if isinstance(node.func, ast.Attribute):
-            return is_tainted(node.func.value, tset) or any(is_tainted(a, tset) for a in node.args)
+            if is_tainted(node.func.value, tset): return True
+            if node.func.attr in ("format", "join") and any(is_tainted(a, tset) for a in node.args): return True
+            return False
         if d == "str": return any(is_tainted(a, tset) for a in node.args)
         return False
     return False
@@ -67,12 +71,18 @@ def scope_of(node):
 def taint_sets(tree):
     scopes = {}
     for n in ast.walk(tree):
-        names, value = None, None
+        recs = []
         if isinstance(n, ast.Assign):
-            names = [x for t in n.targets for x in assign_targets(t)]; value = n.value
+            for tgt in n.targets:
+                if isinstance(tgt, (ast.Tuple, ast.List)) and isinstance(n.value, (ast.Tuple, ast.List)) and len(tgt.elts) == len(n.value.elts):
+                    for te, ve in zip(tgt.elts, n.value.elts):
+                        if isinstance(te, ast.Name): recs.append(([te.id], ve))
+                else:
+                    nm = assign_targets(tgt)
+                    if nm: recs.append((nm, n.value))
         elif isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name) and n.value is not None:
-            names = [n.target.id]; value = n.value
-        if names:
+            recs.append(([n.target.id], n.value))
+        for names, value in recs:
             scopes.setdefault(id(scope_of(n)), []).append((names, value))
     sets = {}
     for sid, recs in scopes.items():

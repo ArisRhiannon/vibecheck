@@ -19,6 +19,10 @@ d("Python analyzer (real ast + taint)", () => {
     expect(has("def h():\n    subprocess.run(['ls', '-la'])", "VC-PY-CMDI")).toBe(false);
     expect(has("def h():\n    return yaml.safe_load(blob)", "VC-PY-YAML")).toBe(false);
   });
+  test("tuple-unpack preserves per-variable taint (QA SEC1)", () => {
+    expect(has("def h():\n    a, b = request.args['a'], 'ok'\n    os.system(a)", "VC-PY-CMDI")).toBe(true);
+    expect(run("def h():\n    a, b = 'ok', request.args['b']\n    cursor.execute(a)").length).toBe(0);
+  });
   test("tainted findings are high confidence", () => {
     expect(run("def h():\n    os.system(request.args['c'])")[0]?.confidence).toBe("high");
   });

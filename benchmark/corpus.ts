@@ -71,4 +71,6 @@ export const CORPUS: Case[] = [
   { name: "py-safe-sanitized", rel: "a.py", code: `def h():\n    uid = int(request.args['id'])\n    cursor.execute(f"SELECT {uid}")`, expect: [] },
   { name: "py-safe-subprocess", rel: "a.py", code: `def h():\n    subprocess.run(["ls", "-la"])`, expect: [] },
   { name: "py-safe-yaml", rel: "a.py", code: "def h():\n    return yaml.safe_load(blob)", expect: [] },
+  { name: "py-tuple-unpack", rel: "a.py", code: "def h():\n    a, b = request.args['a'], 'ok'\n    os.system(a)", expect: ["VC-PY-CMDI"] },
+  { name: "py-safe-tuple", rel: "a.py", code: "def h():\n    a, b = 'ok', request.args['b']\n    cursor.execute(a)", expect: [] },
 ];
