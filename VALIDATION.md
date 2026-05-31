@@ -153,3 +153,16 @@ An independent validator confirmed, with its own snippets and the running tool:
 - **No over-claims:** README/llms.txt/ADR-0005/package.json state "intra-file inter-procedural (1-level summaries)", honest about no cross-file/return-taint/method/destructured, and "not a Semgrep/CodeQL replacement".
 
 QA (code-reviewer) before this: **PASS** (0 P0/P1; 2 P2 = double-parse + stale doc line, both fixed; 1 P3 pre-existing). Verdict: **VALIDATION: PASS**.
+
+
+## v0.4 — Inter-procedural data-flow: return-taint + cross-file (validated)
+
+Verified with concrete snippets (`bun -e` against the public API) and the suite:
+- **Return-taint TP:** `function getInput(){return req.body.x} const v=getInput(); db.query(v)` → VC-SQLI; a **2-hop** chain `a(x){return b(x)} / b(x){return x}` → VC-SQLI.
+- **Return-taint TN (no FP):** `return Number(x)`, `return schema.parse(x)`, `return 42` → no VC-SQLI.
+- **Cross-file TP:** imported source-returning helper and imported param→sink helper (`import {…} from './x'`) → VC-SQLI on the caller file.
+- **Cross-file TN (no FP):** bare-name call without an import → none; a name defined in **two** files, imported from the safe one → **none** (QA FP1 fix); a local function shadows an imported same-name.
+- **No regression:** `isTainted` body unchanged (only `buildTaintSets` gained an optional `summaries` arg defaulting to no-op); `bun test` 43/43; `bun benchmark/run.ts` 69 cases, precision/recall 100%, 0 FP.
+- **Honest docs:** README/llms.txt/ADR-0006 state by-name + 1-hop, the ambiguity-skip, and the FN list (aliased/namespace/re-export imports, deep chains, methods, destructured params); still "not a Semgrep/CodeQL replacement".
+
+QA (code-reviewer): **NEEDS-FIX → fixed** (P1 cross-file name-collision FP eliminated via the ambiguity rule + regression test; P2 `.replace` and >4-hop tracked as known). Verdict: **VALIDATION: PASS**.
