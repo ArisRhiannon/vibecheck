@@ -90,6 +90,7 @@ export const CORPUS: Case[] = [
   { name: "ret-source-helper", rel: "a.ts", code: "function getInput(){ return req.body.x; }\nconst v = getInput();\ndb.query(v);", expect: ["VC-SQLI"] },
   { name: "ret-passthrough", rel: "a.ts", code: "function wrap(x){ return x; }\nconst v = wrap(req.body.id);\ndb.query(v);", expect: ["VC-SQLI"] },
   { name: "ret-safe-constant", rel: "a.ts", code: "function getId(){ return 42; }\nconst v = getId();\ndb.query(v);", expect: [] },
+  { name: "ret-inline-helper", rel: "a.ts", code: "function gi(req){ return req.body.x; }\ndb.query(gi(req));", expect: ["VC-SQLI"] },
   // Go (real go/parser analyzer)
   { name: "go-cmdi", rel: "a.go", code: `package main
 func h(r *http.Request){ exec.Command("sh", "-c", r.FormValue("c")) }`, expect: ["VC-GO-CMDI"] },

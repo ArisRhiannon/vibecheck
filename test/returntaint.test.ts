@@ -14,6 +14,9 @@ describe("return-taint (intra-file inter-procedural)", () => {
   test("a helper that returns a constant does not taint", () => {
     expect(run("function getId(){ return 42; }\nconst v = getId();\ndb.query(v);").length).toBe(0);
   });
+  test("an inline call to a return-tainting helper as a sink arg fires (FN regression)", () => {
+    expect(has("function gi(req){ return req.body.x; }\ndb.query(gi(req));", "VC-SQLI")).toBe(true);
+  });
   test("a sanitizing helper (returns Number(x)) does not taint", () => {
     expect(has("function toId(x){ return Number(x); }\nconst v = toId(req.body.id);\ndb.query(v);", "VC-SQLI")).toBe(false);
   });

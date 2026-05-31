@@ -260,3 +260,12 @@ A rigorous, unbiased subagent battery was run with the explicit goal of **breaki
 - **Result after fixes:** 94-case benchmark 100/100/0FP; 59 tests; corpus unchanged (7 high-confidence, 0 high FP). The independent audit hardened the tool rather than rubber-stamping it.
 
 Note: the deep code-review subagent succeeded this round; the false-negative track returned no output, so FN coverage continues to rely on the documented adversarial self-tests + the corpus.
+
+
+## v0.13 — False-negative audit (end-to-end) + inline return-taint fix
+
+The independent FN subagent had returned no output, so a rigorous FN sweep was run through the **real `scanProject` path** (write file → `collectFiles` → all analyzers): 26 genuinely-vulnerable snippets across every rule family and the inter-procedural features.
+- **Result: 24/26 fired at high confidence.** The 2 non-fires:
+  - `AKIAIOSFODNN7EXAMPLE` (canonical AWS docs key) → **correctly excluded** by design (`/XXXX|EXAMPLE|REDACTED/` guard prevents docs/placeholder FPs); a real `AKIA…` key fires high. Mis-chosen test, not a bug.
+  - **Real FN found:** an **inline** call to a return-tainting helper used directly as a sink arg — `db.query(gi(req))` (vs the via-variable form which already worked). **Fixed**: analyze2's taint check now also resolves inline return-tainting calls via the file summaries. Regression-tested (benchmark `ret-inline-helper` + unit test); the corrected sweep now fires high on all real vulns.
+- After the fix: 95-case benchmark 100/100/0FP; 60 tests; corpus unchanged.
