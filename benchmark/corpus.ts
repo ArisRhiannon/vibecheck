@@ -78,4 +78,8 @@ export const CORPUS: Case[] = [
   { name: "ip-ssrf-helper", rel: "a.ts", code: "const call = (u) => { fetch(u); };\ncall(req.query.url);", expect: ["VC-SSRF"] },
   { name: "ip-safe-helper-sanitized", rel: "a.ts", code: "function q(s){ s = Number(s); db.query(s); }\nq(req.body.x);", expect: [] },
   { name: "ip-safe-helper-literal", rel: "a.ts", code: "function q(s){ db.query(s); }\nq('SELECT 1');", expect: [] },
+  // Return-taint (a value coming back from a helper)
+  { name: "ret-source-helper", rel: "a.ts", code: "function getInput(){ return req.body.x; }\nconst v = getInput();\ndb.query(v);", expect: ["VC-SQLI"] },
+  { name: "ret-passthrough", rel: "a.ts", code: "function wrap(x){ return x; }\nconst v = wrap(req.body.id);\ndb.query(v);", expect: ["VC-SQLI"] },
+  { name: "ret-safe-constant", rel: "a.ts", code: "function getId(){ return 42; }\nconst v = getId();\ndb.query(v);", expect: [] },
 ];
