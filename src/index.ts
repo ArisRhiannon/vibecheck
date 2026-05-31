@@ -6,6 +6,7 @@ export * from "./secrets";
 export * from "./envcheck";
 export * from "./analyze2";
 export * from "./misc";
+export * from "./python";
 export * from "./config";
 export * from "./engine";
 export * from "./report";

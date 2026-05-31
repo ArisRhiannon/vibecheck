@@ -57,4 +57,18 @@ export const CORPUS: Case[] = [
   { name: "sqli-sanitize-reassign-safe", rel: "a.ts", code: "let id = req.query.id; id = Number(id); db.query(`SELECT * FROM u WHERE id = ${id}`);", expect: [] },
   { name: "non-sql-execute-safe", rel: "a.ts", code: "redisClient.execute(req.body.cmd);", expect: [] },
   { name: "xss-docwriteln-taint", rel: "a.ts", code: "document.writeln(location.hash);", expect: ["VC-XSS-DOM"] },
+  // Python (real ast analyzer)
+  { name: "py-rce", rel: "a.py", code: "def h():\n    eval(request.form['x'])", expect: ["VC-PY-RCE"] },
+  { name: "py-cmdi", rel: "a.py", code: "def h():\n    os.system(request.args['cmd'])", expect: ["VC-PY-CMDI"] },
+  { name: "py-cmdi-subprocess", rel: "a.py", code: "def h():\n    subprocess.run(request.args['c'], shell=True)", expect: ["VC-PY-CMDI"] },
+  { name: "py-sqli", rel: "a.py", code: `def h():\n    cursor.execute(f"SELECT * FROM u WHERE id={request.args['id']}")`, expect: ["VC-PY-SQLI"] },
+  { name: "py-deser", rel: "a.py", code: "def h():\n    pickle.loads(request.data)", expect: ["VC-PY-DESERIALIZE"] },
+  { name: "py-yaml", rel: "a.py", code: "def h():\n    yaml.load(blob)", expect: ["VC-PY-YAML"] },
+  { name: "py-ssti", rel: "a.py", code: "def h():\n    return render_template_string(request.args['t'])", expect: ["VC-PY-SSTI"] },
+  { name: "py-redirect", rel: "a.py", code: "def h():\n    return redirect(request.args['next'])", expect: ["VC-PY-OPEN-REDIRECT"] },
+  { name: "py-path", rel: "a.py", code: "def h():\n    return open(request.args['f']).read()", expect: ["VC-PY-PATH"] },
+  { name: "py-safe-param", rel: "a.py", code: `def h():\n    cursor.execute("SELECT * FROM u WHERE id=%s", [uid])`, expect: [] },
+  { name: "py-safe-sanitized", rel: "a.py", code: `def h():\n    uid = int(request.args['id'])\n    cursor.execute(f"SELECT {uid}")`, expect: [] },
+  { name: "py-safe-subprocess", rel: "a.py", code: `def h():\n    subprocess.run(["ls", "-la"])`, expect: [] },
+  { name: "py-safe-yaml", rel: "a.py", code: "def h():\n    return yaml.safe_load(blob)", expect: [] },
 ];

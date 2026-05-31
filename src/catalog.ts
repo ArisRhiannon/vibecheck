@@ -28,4 +28,12 @@ export const RULES: Record<string, { summary: string; fix: string }> = {
   "VC-NEXT-PUBLIC-SECRET": { summary: "A NEXT_PUBLIC_* var holds a secret and is bundled into client JS.", fix: "Drop the NEXT_PUBLIC_ prefix; read it only on the server." },
   "VC-SUPABASE-SERVICE-ROLE": { summary: "The Supabase service_role key (bypasses RLS) is referenced.", fix: "Use the anon key client-side; keep service_role server-only." },
   "VC-STACK-EXPOSURE": { summary: "An error stack trace is returned in the HTTP response.", fix: "Log stacks server-side; return a generic message." },
+  "VC-PY-RCE": { summary: "Python eval()/exec() runs a non-literal value (RCE).", fix: "Use ast.literal_eval or an explicit dispatch; never eval input." },
+  "VC-PY-CMDI": { summary: "Python os.system/os.popen/subprocess(shell=True) runs tainted input (command injection).", fix: "Use subprocess with an args list and shell=False; validate inputs." },
+  "VC-PY-SQLI": { summary: "Python SQL built from tainted input via cursor.execute/raw (SQL injection).", fix: "Use parameterized queries: cursor.execute(sql, params)." },
+  "VC-PY-DESERIALIZE": { summary: "pickle.loads() on tainted input (arbitrary code execution).", fix: "Never unpickle untrusted data; use JSON or a safe schema." },
+  "VC-PY-YAML": { summary: "yaml.load() without a safe Loader (arbitrary object construction).", fix: "Use yaml.safe_load() or Loader=yaml.SafeLoader." },
+  "VC-PY-SSTI": { summary: "render_template_string() with tainted input (server-side template injection).", fix: "Render fixed templates with context vars; never template user input." },
+  "VC-PY-OPEN-REDIRECT": { summary: "Python redirect() to a tainted target (open redirect).", fix: "Redirect only to an allowlist of paths/hosts." },
+  "VC-PY-PATH": { summary: "Python open()/send_file() with a tainted path (path traversal).", fix: "Resolve against a fixed base dir and reject '..' escapes." },
 };
