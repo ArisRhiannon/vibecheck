@@ -1,6 +1,6 @@
 import { type SourceFile, type Finding, type Severity } from "./types";
 import { parseFile, traverse, t } from "./ast";
-import { buildTaintSets, buildSummaries, taintedAt, isTainted, isSourceExpr, type Summaries } from "./taint";
+import { buildTaintSets, buildSummaries, taintedAt, isTainted, isSourceExpr, resolveImports, type Summaries } from "./taint";
 
 const JS = /\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
 const CP = new Set(["exec", "execSync", "execFile", "execFileSync", "spawn", "spawnSync"]);
@@ -51,20 +51,13 @@ function fixpoint(assigns: Array<{ names: string[]; expr: t.Node | null | undefi
   return s;
 }
 
-function importedNames(file: t.File): Set<string> {
-  const names = new Set<string>();
-  traverse(file, { ImportDeclaration(path) { for (const sp of path.node.specifiers) names.add(sp.local.name); } });
-  return names;
-}
-
 type ParamSink = { param: number; hit: Sink };
 
 /** Intra-file AND cross-file (by imported name) inter-procedural findings: a call passes attacker input
  *  into a helper whose parameter provably reaches a dangerous sink (sanitizers respected). Taint-backed → high. */
 export function interprocFindings(files: SourceFile[], summariesByRel?: Map<string, Summaries>): Finding[] {
   const out: Finding[] = [];
-  const infos: Array<{ f: SourceFile; ast: t.File; summary: Map<string, ParamSink[]>; imports: Set<string>; defined: Set<string> }> = [];
-  const global = new Map<string, ParamSink[]>();
+  const infos: Array<{ f: SourceFile; ast: t.File; summary: Map<string, ParamSink[]> }> = [];
 
   for (const f of files) {
     if (!JS.test(f.rel)) continue;
@@ -93,24 +86,28 @@ export function interprocFindings(files: SourceFile[], summariesByRel?: Map<stri
       fn.params.forEach((pn, i) => { if (!pn) return; const set = fixpoint(assigns, new Set([pn])); for (const hit of sinks) if (isTainted(hit.arg, set)) ps.push({ param: i, hit }); });
       if (ps.length) summary.set(name, ps);
     }
-    infos.push({ f, ast, summary, imports: importedNames(ast), defined: new Set(fns.keys()) });
+    infos.push({ f, ast, summary });
   }
-  // A helper name defined in >1 file is ambiguous (no module resolution) → never resolve it cross-file.
-  const defCount = new Map<string, number>();
-  for (const info of infos) for (const n of info.defined) defCount.set(n, (defCount.get(n) ?? 0) + 1);
-  for (const info of infos) for (const [n, ps] of info.summary) if ((defCount.get(n) ?? 0) === 1 && !global.has(n)) global.set(n, ps);
+  const relSet = new Set(infos.map((i) => i.f.rel));
+  const summaryByRel = new Map(infos.map((i) => [i.f.rel, i.summary]));
 
-  for (const { f, ast, summary, imports } of infos) {
+  for (const { f, ast, summary } of infos) {
     const effective = new Map(summary);
-    for (const n of imports) { const g = global.get(n); if (g && !effective.has(n)) effective.set(n, g); }
+    for (const e of resolveImports(ast, f.rel, relSet)) {
+      const from = summaryByRel.get(e.fromRel);
+      if (!from) continue;
+      if (e.ns) { for (const [n, ps] of from) effective.set(`${e.local}.${n}`, ps); }
+      else { const ps = from.get(e.orig); if (ps) effective.set(e.local, ps); }
+    }
     if (!effective.size) continue;
     const sets = buildTaintSets(ast, summariesByRel?.get(f.rel) ?? buildSummaries(ast));
     const lines = f.content.split("\n");
     traverse(ast, {
       CallExpression(path) {
         const callee = path.node.callee;
-        if (!t.isIdentifier(callee)) return;
-        const ps = effective.get(callee.name);
+        const key = t.isIdentifier(callee) ? callee.name
+          : (t.isMemberExpression(callee) && t.isIdentifier(callee.object) && t.isIdentifier(callee.property)) ? `${callee.object.name}.${callee.property.name}` : null;
+        const ps = key ? effective.get(key) : undefined;
         if (!ps) return;
         for (const { param, hit } of ps) {
           const arg = path.node.arguments[param] as t.Node | undefined;
@@ -118,7 +115,7 @@ export function interprocFindings(files: SourceFile[], summariesByRel?: Map<stri
           const line = path.node.loc?.start.line ?? 1;
           out.push({ ruleId: hit.ruleId, severity: hit.severity, confidence: "high", file: f.rel, line,
             col: (path.node.loc?.start.column ?? 0) + 1,
-            message: `tainted input flows through ${callee.name}() into ${hit.sink} (inter-procedural)`,
+            message: `tainted input flows through ${key}() into ${hit.sink} (inter-procedural)`,
             snippet: (lines[line - 1] ?? "").trim(), remediation: hit.fix });
         }
       },

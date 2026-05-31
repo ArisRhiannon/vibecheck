@@ -150,8 +150,11 @@ function paramOf(p: t.Node): string | null {
 export function returnTainted(node: t.Node | null | undefined, set: Set<string>, summaries: Summaries): boolean {
   if (!node) return false;
   if (t.isAwaitExpression(node)) return returnTainted(node.argument, set, summaries);
-  if ((t.isCallExpression(node) || t.isOptionalCallExpression(node)) && t.isIdentifier(node.callee)) {
-    const s = summaries.get(node.callee.name);
+  if (t.isCallExpression(node) || t.isOptionalCallExpression(node)) {
+    const callee = node.callee;
+    const key = t.isIdentifier(callee) ? callee.name
+      : (t.isMemberExpression(callee) && t.isIdentifier(callee.object) && t.isIdentifier(callee.property)) ? `${callee.object.name}.${callee.property.name}` : null;
+    const s = key ? summaries.get(key) : undefined;
     if (!s) return false;
     if (s.returnsAbsolute) return true;
     return [...s.returnParams].some((i) => {
@@ -222,14 +225,49 @@ export function buildSummaries(file: t.File, base?: Summaries): Summaries {
 
 
 const JS_SUM = /\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
-function importedNames(file: t.File): Set<string> {
-  const names = new Set<string>();
-  traverse(file, { ImportDeclaration(path) { for (const sp of path.node.specifiers) names.add(sp.local.name); } });
-  return names;
+const RESOLVE_EXTS = ["", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"];
+
+/** Normalize a POSIX-style path collapsing "." and ".." segments. */
+function normalizePath(p: string): string {
+  const out: string[] = [];
+  for (const seg of p.split("/")) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === "..") out.pop();
+    else out.push(seg);
+  }
+  return out.join("/");
 }
 
-/** Per-file return-taint summaries with cross-file resolution: a function's summary is visible to other
- *  files that import it by name (1-hop, by-name; no full module resolution). */
+/** Resolve a relative import `source` (from `importerRel`) to a scanned file's rel path, or null. */
+function resolveModule(source: string, importerRel: string, relSet: Set<string>): string | null {
+  if (!source.startsWith(".")) return null;
+  const dir = importerRel.includes("/") ? importerRel.slice(0, importerRel.lastIndexOf("/")) : "";
+  const joined = normalizePath(`${dir}/${source}`);
+  for (const e of RESOLVE_EXTS) if (relSet.has(joined + e)) return joined + e;
+  return null;
+}
+
+export interface ImportEdge { local: string; orig: string; fromRel: string; ns: boolean; }
+
+/** Relative-import edges from `importerRel`, resolved to the defining file. Handles named, aliased
+ *  (`a as b`) and namespace (`* as ns`) imports; bare/unresolved imports are skipped (a false negative). */
+export function resolveImports(file: t.File, importerRel: string, relSet: Set<string>): ImportEdge[] {
+  const edges: ImportEdge[] = [];
+  traverse(file, {
+    ImportDeclaration(path) {
+      const fromRel = resolveModule(path.node.source.value, importerRel, relSet);
+      if (!fromRel) return;
+      for (const sp of path.node.specifiers) {
+        if (t.isImportSpecifier(sp)) edges.push({ local: sp.local.name, orig: t.isIdentifier(sp.imported) ? sp.imported.name : sp.imported.value, fromRel, ns: false });
+        else if (t.isImportNamespaceSpecifier(sp)) edges.push({ local: sp.local.name, orig: "*", fromRel, ns: true });
+      }
+    },
+  });
+  return edges;
+}
+
+/** Per-file return-taint summaries with REAL cross-file resolution: relative imports are resolved to the
+ *  defining file (named + aliased + namespace), and a cross-file fixpoint propagates multi-hop chains. */
 export function crossFileSummaries(files: SourceFile[]): Map<string, Summaries> {
   const parsed = new Map<string, t.File>();
   const local = new Map<string, Summaries>();
@@ -240,16 +278,27 @@ export function crossFileSummaries(files: SourceFile[]): Map<string, Summaries> 
     parsed.set(f.rel, ast);
     local.set(f.rel, buildSummaries(ast));
   }
-  // A name defined in >1 file is ambiguous (no real module resolution) → never resolve it cross-file.
-  const defCount = new Map<string, number>();
-  for (const s of local.values()) for (const n of s.keys()) defCount.set(n, (defCount.get(n) ?? 0) + 1);
-  const global: Summaries = new Map();
-  for (const s of local.values()) for (const [n, sm] of s) if ((defCount.get(n) ?? 0) === 1) global.set(n, sm);
-  const out = new Map<string, Summaries>();
-  for (const [rel, ast] of parsed) {
-    const base: Summaries = new Map(local.get(rel));
-    for (const n of importedNames(ast)) { const g = global.get(n); if (g && !base.has(n)) base.set(n, g); }
-    out.set(rel, buildSummaries(ast, base));
+  const relSet = new Set(parsed.keys());
+  const edges = new Map<string, ImportEdge[]>();
+  for (const [rel, ast] of parsed) edges.set(rel, resolveImports(ast, rel, relSet));
+  const eff = new Map<string, Summaries>();
+  for (const [rel, s] of local) eff.set(rel, new Map(s));
+  for (let iter = 0; iter < 5; iter++) {
+    let changed = false;
+    for (const [rel, ast] of parsed) {
+      const base: Summaries = new Map(local.get(rel));
+      for (const e of edges.get(rel) ?? []) {
+        const fromEff = eff.get(e.fromRel);
+        if (!fromEff) continue;
+        if (e.ns) for (const [n, s] of fromEff) base.set(`${e.local}.${n}`, s);
+        else { const s = fromEff.get(e.orig); if (s) base.set(e.local, s); }
+      }
+      const ne = buildSummaries(ast, base);
+      const prev = eff.get(rel);
+      if (!prev || prev.size !== ne.size || [...ne].some(([k, v]) => { const p = prev.get(k); return !p || p.returnsAbsolute !== v.returnsAbsolute || p.returnParams.size !== v.returnParams.size; })) changed = true;
+      eff.set(rel, ne);
+    }
+    if (!changed) break;
   }
-  return out;
+  return eff;
 }
