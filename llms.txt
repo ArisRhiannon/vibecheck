@@ -1,0 +1,21 @@
+# vibecheck
+
+> Offline, zero-dependency, no-AI "safe to ship?" gate for vibe-coded apps. Detects the security and
+> config mistakes AI coding agents commonly make (committed secrets, unprotected routes, eval-RCE, SQL
+> injection, permissive CORS, weak JWT, insecure cookies, leaked NEXT_PUBLIC/Supabase keys, missing
+> input validation). Runs as a CLI, a library, or an MCP server. No network, no telemetry.
+
+## For agents
+- Run `vibecheck . --ci` before declaring a coding task done; fix all critical/high findings.
+- Machine-readable output: `vibecheck . --json` → `{ findings: [...], counts: {...} }`.
+- MCP: run `vibecheck mcp` (stdio) and call the `scan` tool with `{ "dir": "." }`.
+- See [AGENTS.md](AGENTS.md) for the full agent workflow.
+
+## Docs
+- [README](README.md): model, threat model, full rule table, CLI/MCP usage, config.
+- [Rules](docs/PLAN.md): the implemented detectors and their acceptance criteria.
+- [ADRs](docs/adr): design decisions (heuristic scanning, agent-first interface).
+
+## Notes
+- Heuristic, not a full taint analyzer; a high-signal gate, not a proof of security.
+- License: source-available (AGPL-3.0 + commercial threshold). See LICENSE.
