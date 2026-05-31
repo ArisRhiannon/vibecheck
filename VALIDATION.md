@@ -140,3 +140,16 @@ An independent validator re-ran the tool and confirmed, with its own adversarial
 - **No over-claims:** intra-procedural limit, curated benchmark, python3 requirement, and "not a Semgrep/CodeQL replacement" all stated.
 
 QA (code-reviewer) before this: NEEDS-FIX with 0 P0, 1 P1 (tuple-unpack taint loss) — fixed and regression-tested. Verdict: **VALIDATION: PASS**.
+
+
+## v0.3 — Intra-file inter-procedural taint (independent validation: PASS)
+
+An independent validator confirmed, with its own snippets and the running tool:
+- **Catches what the intra-procedural pass misses:** `function q(s){ db.query(s); } q(req.body.x);` → `astFindings` alone = 0 VC-SQLI; `interprocFindings` = 1 VC-SQLI (**high**). Same for SSRF via `fetch` helper; for the `child_process` helper the inter-proc adds the high-confidence call-site finding.
+- **Zero false positives** across 8 adversarial-safe scenarios: sanitized helper (`Number(s)`, `schema.parse(s)`), literal/non-tainted args, non-DB `redis.query`/`httpClient.execute`, method calls, destructured params.
+- **Sanitizer respected across the helper:** `function q(s){ s = Number(s); db.query(s); }` → 0 findings.
+- **Additive / no regression:** `git show --stat` confirms `taint.ts` + `analyze2.ts` untouched; only `interproc.ts` added + wiring. `bun test` 35/35; `bun benchmark/run.ts` 66 cases, precision/recall 100%, 0 FP. Engine de-dupes by `file:line:rule`.
+- **High-confidence only**, emitted only when the call-site arg is a source/tainted.
+- **No over-claims:** README/llms.txt/ADR-0005/package.json state "intra-file inter-procedural (1-level summaries)", honest about no cross-file/return-taint/method/destructured, and "not a Semgrep/CodeQL replacement".
+
+QA (code-reviewer) before this: **PASS** (0 P0/P1; 2 P2 = double-parse + stale doc line, both fixed; 1 P3 pre-existing). Verdict: **VALIDATION: PASS**.
