@@ -184,8 +184,12 @@ func analyze(fset *token.FileSet, file *ast.File, path string, out *[]Finding) {
 			}
 			if sel, ok2 := c.Fun.(*ast.SelectorExpr); ok2 {
 				m := sel.Sel.Name
-				if (m == "Query" || m == "QueryRow" || m == "Exec" || m == "QueryContext" || m == "QueryRowContext" || m == "ExecContext") {
-					if x, ok3 := sel.X.(*ast.Ident); ok3 && dbRecv[strings.ToLower(x.Name)] && anyTainted(c.Args, set) {
+				if m == "Query" || m == "QueryRow" || m == "Exec" || m == "QueryContext" || m == "QueryRowContext" || m == "ExecContext" {
+					qi := 0
+					if strings.HasSuffix(m, "Context") {
+						qi = 1
+					}
+					if x, ok3 := sel.X.(*ast.Ident); ok3 && dbRecv[strings.ToLower(x.Name)] && len(c.Args) > qi && isTainted(c.Args[qi], set) {
 						add(c, "VC-GO-SQLI", "critical", "SQL built from tainted input (SQL injection)", "Use parameterized queries with placeholders ($1/?) and args.")
 					}
 				}
@@ -196,7 +200,7 @@ func analyze(fset *token.FileSet, file *ast.File, path string, out *[]Finding) {
 			if s == "http.Redirect" && len(c.Args) >= 3 && isTainted(c.Args[2], set) {
 				add(c, "VC-GO-OPEN-REDIRECT", "medium", "redirect target is tainted (open redirect)", "Redirect only to an allowlist of paths/hosts.")
 			}
-			if (s == "http.Get" || s == "http.Post" || s == "http.Head" || strings.HasSuffix(s, ".Do") || s == "http.NewRequest") && anyTainted(c.Args, set) {
+			if (s == "http.Get" || s == "http.Post" || s == "http.Head" || s == "http.NewRequest") && anyTainted(c.Args, set) {
 				add(c, "VC-GO-SSRF", "high", "outbound request to a tainted URL (SSRF)", "Validate the URL against a host allowlist; block internal IPs.")
 			}
 			return true

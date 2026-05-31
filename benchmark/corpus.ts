@@ -95,4 +95,6 @@ func h(r *http.Request){ http.Get(r.FormValue("u")) }`, expect: ["VC-GO-SSRF"] }
 func h(r *http.Request){ id, _ := strconv.Atoi(r.FormValue("id")); db.Query("SELECT * WHERE id=$1", id) }`, expect: [] },
   { name: "go-safe-fixed", rel: "a.go", code: `package main
 func h(){ exec.Command("ls", "-la") }`, expect: [] },
+  { name: "go-safe-param-raw", rel: "a.go", code: `package main
+func h(r *http.Request){ db.Query("SELECT * FROM u WHERE id = $1", r.FormValue("id")) }`, expect: [] },
 ];

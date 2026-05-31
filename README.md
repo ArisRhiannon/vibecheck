@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A fast, **agent-native** "safe to ship?" gate for vibe-coded apps. It parses your **JS/TS/JSX/TSX**
-(`@babel/parser`) and **Python** (the stdlib `ast`) with **real parsers** and uses **taint analysis**
+(`@babel/parser`), **Python** (the stdlib `ast`), and **Go** (`go/parser`) with **real parsers** and uses **taint analysis**
 (inter-procedural for JS/TS — return-taint + param→sink summaries, within a file and across files by
 imported name) to flag the security classes AI coding agents get wrong — committed secrets, SQL
 injection through *abstracted* raw-query APIs, XSS, SSRF, path traversal, command injection, insecure
@@ -30,7 +30,7 @@ loops and pre-commit in milliseconds**, with **published precision/recall** so y
 |--|--|--|--|
 | Parsing | real AST (Babel JS/TS/JSX + Python `ast`) | real, many langs | real, many langs |
 | Data-flow | inter-procedural (return-taint + param→sink; intra-file + cross-file by import) | taint (Pro) | full inter-procedural |
-| Languages (v0.2) | **JS/TS/JSX/TSX + Python** | many | many |
+| Languages | **JS/TS/JSX/TSX + Python + Go** | many | many |
 | Speed / infra | ms, local, no account | fast | slower, CI-oriented |
 | Agent-native (MCP, confidence gating) | **yes, first-class** | partial | no |
 | Breadth of rules | small, focused | 2000+ | huge |
@@ -40,7 +40,7 @@ pre-flight** that won't drown an agent in false positives.
 
 ## Measured quality (not claimed)
 
-Against a labeled benchmark of **62 cases** across JS/TS **and** Python (vulnerable + safe + deliberately
+Against a labeled benchmark of **75 cases** across JS/TS, Python **and** Go (vulnerable + safe + deliberately
 tricky-safe), the core detectors score (see [`METRICS.md`](METRICS.md), reproduce with `bun benchmark/run.ts`):
 
 - **Precision 100%**, **Recall 100%**, **F1 100%** on the corpus.
@@ -72,8 +72,9 @@ vibecheck mcp           # MCP stdio server exposing a `scan` tool (high-confiden
 Agents: see [`AGENTS.md`](AGENTS.md) — run `vibecheck . --ci` before declaring a task done and fix every
 high-confidence finding.
 
-> JS/TS scanning needs nothing extra. **Python scanning** additionally requires **`python3` on PATH**
-> (used only to parse via the stdlib `ast`); if it's absent, `.py` files are silently skipped.
+> JS/TS scanning needs nothing extra. **Python** scanning requires **`python3` on PATH**; **Go** scanning
+> requires a **`go` toolchain on PATH** (the analyzer is compiled once and cached). If a runtime is absent,
+> those files are silently skipped.
 
 ## Rules (exactly what is implemented + benchmarked)
 
@@ -83,17 +84,19 @@ Taint-backed: `VC-RCE-EVAL`, `VC-RCE-CHILD-PROCESS`, `VC-SQLI`, `VC-XSS-REACT`, 
 `VC-ENV-COMMITTED/DRIFT/MISSING`, `VC-NEXT-PUBLIC-SECRET`, `VC-SUPABASE-SERVICE-ROLE`. Advisory:
 `VC-ROUTE-NO-AUTH` (review), `VC-INPUT-NO-VALIDATION`. **Python** (`VC-PY-*`): `VC-PY-RCE`,
 `VC-PY-CMDI`, `VC-PY-SQLI`, `VC-PY-DESERIALIZE`, `VC-PY-YAML`, `VC-PY-SSTI`, `VC-PY-OPEN-REDIRECT`,
-`VC-PY-PATH`. `vibecheck explain <id>` prints the fix for each.
+`VC-PY-PATH`. **Go** (`VC-GO-*`): `VC-GO-CMDI`, `VC-GO-SQLI`, `VC-GO-PATH`, `VC-GO-OPEN-REDIRECT`,
+`VC-GO-SSRF`. `vibecheck explain <id>` prints the fix for each.
 
 ## Limitations (honest)
 
-- **JS/TS/JSX/TSX + Python** in v0.2 (Python needs `python3` on PATH). More languages are roadmap (via
-  each language's own real parser / tree-sitter, never hand-rolled).
+- **JS/TS/JSX/TSX + Python + Go** (Python needs `python3`, Go needs a `go` toolchain on PATH). More
+  languages are roadmap (each via its own real parser, never hand-rolled).
 - **Taint scope:** JS/TS taint is **inter-procedural** — function summaries carry **return-taint** and
   **parameter→sink** reachability, resolved **within a file and across files by imported name** (1-hop,
   sanitizers respected). Not tracked (false negatives): aliased/namespace/re-exported imports, helper
   chains beyond a few hops, methods, destructured params, and names defined in **multiple** files
-  (treated as ambiguous and skipped — to avoid false positives). Python is intra-procedural.
+  (treated as ambiguous and skipped — to avoid false positives). Python and Go are intra-procedural
+  (Go does not track multi-return assignments like `x, _ := f(src)`).
 - Config/secret rules are pattern-based where AST adds no value.
 - A high-signal gate and early-warning — **not a proof of security**. Pair it with Semgrep/CodeQL and review.
 

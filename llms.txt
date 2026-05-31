@@ -1,7 +1,7 @@
 # vibecheck
 
-> Agent-native "safe to ship?" gate for vibe-coded apps. Parses JS/TS/JSX/TSX (Babel) and Python
-> (the stdlib ast) with real parsers and uses taint analysis (JS/TS inter-procedural: return-taint +
+> Agent-native "safe to ship?" gate for vibe-coded apps. Parses JS/TS/JSX/TSX (Babel), Python
+> (the stdlib ast), and Go (go/parser) with real parsers and uses taint analysis (JS/TS inter-procedural: return-taint +
 > param→sink summaries, intra-file and cross-file by imported name; Python intra-procedural) to flag the security
 > classes AI coding agents get wrong (committed secrets, SQL injection via raw-query APIs, XSS, SSRF,
 > path traversal, command injection, insecure deserialization, weak JWT/CORS/cookies). Every finding is

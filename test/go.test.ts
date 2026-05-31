@@ -19,6 +19,8 @@ func h(r *http.Request){ http.Get(r.FormValue("u")) }`, "VC-GO-SSRF")).toBe(true
   test("safe Go does not fire", () => {
     expect(run(`package main
 func h(r *http.Request){ id, _ := strconv.Atoi(r.FormValue("id")); db.Query("SELECT * WHERE id=$1", id) }`).length).toBe(0);
+    expect(run(`package main
+func h(r *http.Request){ db.Query("SELECT * FROM u WHERE id = $1", r.FormValue("id")) }`).length).toBe(0);
     expect(has(`package main
 func h(){ exec.Command("ls", "-la") }`, "VC-GO-CMDI")).toBe(false);
   });
