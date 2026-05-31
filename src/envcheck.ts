@@ -19,7 +19,7 @@ export function envFindings(files: SourceFile[]): Finding[] {
   const out: Finding[] = [];
   for (const f of files) {
     if (isEnv(f.rel) && !isExample(f.rel)) {
-      out.push({ ruleId: "VC-ENV-COMMITTED", severity: "high", file: f.rel, line: 1, col: 1, message: `${base(f.rel)} is not gitignored — secrets in it are likely committed`, snippet: base(f.rel), remediation: "Add .env to .gitignore, purge it from git history, and rotate any secret it held." });
+      out.push({ ruleId: "VC-ENV-COMMITTED", severity: "high", confidence: "high", file: f.rel, line: 1, col: 1, message: `${base(f.rel)} is not gitignored — secrets in it are likely committed`, snippet: base(f.rel), remediation: "Add .env to .gitignore, purge it from git history, and rotate any secret it held." });
     }
   }
   const real = files.find((f) => isEnv(f.rel) && !isExample(f.rel));
@@ -28,8 +28,8 @@ export function envFindings(files: SourceFile[]): Finding[] {
     const rk = envKeys(real.content), ek = envKeys(example.content);
     const undocumented = [...rk].filter((k) => !ek.has(k));
     const missing = [...ek].filter((k) => !rk.has(k));
-    if (undocumented.length) out.push({ ruleId: "VC-ENV-DRIFT", severity: "low", file: example.rel, line: 1, col: 1, message: `vars in ${base(real.rel)} not documented in ${base(example.rel)}: ${undocumented.join(", ")}`, snippet: "", remediation: "List every variable (keys only, no values) in .env.example so deploys don't miss config." });
-    if (missing.length) out.push({ ruleId: "VC-ENV-MISSING", severity: "medium", file: real.rel, line: 1, col: 1, message: `vars documented in ${base(example.rel)} but missing from ${base(real.rel)}: ${missing.join(", ")}`, snippet: "", remediation: "Set the missing variables before running or deploying." });
+    if (undocumented.length) out.push({ ruleId: "VC-ENV-DRIFT", severity: "low", confidence: "high", file: example.rel, line: 1, col: 1, message: `vars in ${base(real.rel)} not documented in ${base(example.rel)}: ${undocumented.join(", ")}`, snippet: "", remediation: "List every variable (keys only, no values) in .env.example so deploys don't miss config." });
+    if (missing.length) out.push({ ruleId: "VC-ENV-MISSING", severity: "medium", confidence: "high", file: real.rel, line: 1, col: 1, message: `vars documented in ${base(example.rel)} but missing from ${base(real.rel)}: ${missing.join(", ")}`, snippet: "", remediation: "Set the missing variables before running or deploying." });
   }
   return out;
 }

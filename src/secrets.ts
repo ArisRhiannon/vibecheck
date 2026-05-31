@@ -54,7 +54,7 @@ export function secretFindings(files: SourceFile[]): Finding[] {
       for (const m of file.content.matchAll(rule.re)) {
         if (/XXXX|EXAMPLE|REDACTED/i.test(m[0])) continue;
         const { line, col } = locate(file.content, m.index);
-        push({ ruleId: rule.id, severity: rule.severity, file: file.rel, line, col, message: rule.message, snippet: lineAt(file.content, m.index), remediation: rule.remediation });
+        push({ ruleId: rule.id, severity: rule.severity, confidence: "high", file: file.rel, line, col, message: rule.message, snippet: lineAt(file.content, m.index), remediation: rule.remediation });
       }
     }
     ASSIGN.lastIndex = 0;
@@ -63,7 +63,7 @@ export function secretFindings(files: SourceFile[]): Finding[] {
       const value = m[4] as string;
       if (!SECRET_KEY.test(name) || isToken(value) || !looksLikeSecretValue(value)) continue;
       const { line, col } = locate(file.content, m.index);
-      push({ ruleId: "VC-SECRET-HIGH-ENTROPY", severity: "high", file: file.rel, line, col, message: `hardcoded secret-looking value assigned to "${name}"`, snippet: lineAt(file.content, m.index), remediation: "Move the value to an env var / secret manager and reference it at runtime." });
+      push({ ruleId: "VC-SECRET-HIGH-ENTROPY", severity: "high", confidence: "medium", file: file.rel, line, col, message: `hardcoded secret-looking value assigned to "${name}"`, snippet: lineAt(file.content, m.index), remediation: "Move the value to an env var / secret manager and reference it at runtime." });
     }
   }
   return out;
