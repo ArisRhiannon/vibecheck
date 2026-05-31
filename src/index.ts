@@ -3,3 +3,4 @@ export * from "./walk";
 export * from "./secrets";
 export * from "./envcheck";
 export * from "./codescan";
+export * from "./routes";
