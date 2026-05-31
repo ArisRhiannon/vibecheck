@@ -97,6 +97,8 @@ func h(r *http.Request){ http.Get(r.FormValue("u")) }`, expect: ["VC-GO-SSRF"] }
   { name: "go-open-redirect", rel: "a.go", code: `package main
 func h(w http.ResponseWriter, r *http.Request){ http.Redirect(w, r, r.FormValue("next"), 302) }`, expect: ["VC-GO-OPEN-REDIRECT"] },
   { name: "open-redirect-relative-safe", rel: "a.ts", code: "res.redirect('/dashboard/' + req.query.tab);", expect: [] },
+  { name: "ssrf-client-location-safe", rel: "a.ts", code: "fetch(`${document.location}?x=1`);", expect: [] },
+  { name: "ssrf-server-via-var", rel: "a.ts", code: "const u = req.query.url;\nfetch(u);", expect: ["VC-SSRF"] },
   { name: "go-safe-param", rel: "a.go", code: `package main
 func h(r *http.Request){ id, _ := strconv.Atoi(r.FormValue("id")); db.Query("SELECT * WHERE id=$1", id) }`, expect: [] },
   { name: "go-safe-fixed", rel: "a.go", code: `package main

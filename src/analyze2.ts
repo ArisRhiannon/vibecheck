@@ -26,6 +26,36 @@ function isRelativeRedirect(node: t.Node): boolean {
   return p !== null && /^\/[^/]/.test(p);
 }
 
+/** Does the expression's taint come from a SERVER source (req/request/ctx/event, a request call, or a
+ *  tainted variable) rather than only a client-side DOM `location`? Used to keep SSRF server-side. */
+function hasServerContributor(node: t.Node, set: Set<string>): boolean {
+  let ok = false;
+  const w = (n: t.Node | null | undefined): void => {
+    if (!n || ok) return;
+    if (t.isMemberExpression(n) || t.isOptionalMemberExpression(n)) {
+      const p = memberPath(n);
+      if (p && /^(?:req|request|ctx|event)\./.test(p)) { ok = true; return; }
+      if (p && /(?:^|\.)location\b/.test(p)) return; // client-side DOM source — not server
+      w(n.object); return;
+    }
+    if (t.isIdentifier(n)) { if (set.has(n.name)) ok = true; return; }
+    if (t.isCallExpression(n) || t.isOptionalCallExpression(n)) {
+      if (isSourceExpr(n)) { ok = true; return; }
+      n.arguments.forEach((a) => w(a as t.Node));
+      if (t.isMemberExpression(n.callee)) w(n.callee.object);
+      return;
+    }
+    if (t.isTemplateLiteral(n)) { n.expressions.forEach(w); return; }
+    if (t.isBinaryExpression(n)) { w(n.left as t.Node); w(n.right); return; }
+    if (t.isConditionalExpression(n)) { w(n.consequent); w(n.alternate); return; }
+    if (t.isLogicalExpression(n)) { w(n.left); w(n.right); return; }
+    if (t.isAwaitExpression(n)) { w(n.argument); return; }
+    if (t.isTSAsExpression(n) || t.isTSNonNullExpression(n)) { w(n.expression); return; }
+  };
+  w(node);
+  return ok;
+}
+
 /** Find an object-expression argument and return a property's value node by key, if present. */
 function prop(obj: t.Node | undefined, key: string): t.Node | undefined {
   if (!obj || !t.isObjectExpression(obj)) return undefined;
@@ -62,6 +92,7 @@ export function astFindings(files: SourceFile[], summariesByRel?: Map<string, Su
         const arg0 = node.arguments[0] as t.Node | undefined;
         const cp = memberPath(callee as t.Node);
         const tainted = (n: t.Node | undefined) => !!n && taintedAt(path, n, ast, sets);
+        const scopeSet = sets.get(path.getFunctionParent()?.node ?? ast.program) ?? new Set<string>();
 
         // eval(x)
         if (t.isIdentifier(callee) && callee.name === "eval" && arg0 && !literalish(arg0)) {
@@ -89,7 +120,7 @@ export function astFindings(files: SourceFile[], summariesByRel?: Map<string, Su
         // SSRF: fetch/axios/got/http(s).get with tainted URL
         const ssrf = (t.isIdentifier(callee) && ["fetch", "axios", "got", "request"].includes(callee.name)) ||
           (t.isMemberExpression(callee) && t.isIdentifier(callee.property) && ["get", "post", "request"].includes(callee.property.name) && t.isIdentifier(callee.object) && ["axios", "http", "https", "got"].includes(callee.object.name));
-        if (ssrf && tainted(arg0)) mk(node, "VC-SSRF", "high", "high", "server-side request to a tainted URL (SSRF)", "Validate the URL against an allowlist of hosts; block internal/metadata IPs.");
+        if (ssrf && arg0 && tainted(arg0) && hasServerContributor(arg0, scopeSet)) mk(node, "VC-SSRF", "high", "high", "server-side request to a tainted URL (SSRF)", "Validate the URL against an allowlist of hosts; block internal/metadata IPs.");
         // Path traversal: fs.* with tainted path
         if (t.isMemberExpression(callee) && t.isIdentifier(callee.property) && FS_SINK.has(callee.property.name) && tainted(arg0)) {
           mk(node, "VC-PATH-TRAVERSAL", "high", "high", "filesystem path built from tainted input (path traversal)", "Resolve against a fixed base dir and reject paths that escape it (no '..').");
