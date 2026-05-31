@@ -4,7 +4,7 @@ import { type SourceFile, VibecheckError } from "./types";
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "coverage", ".next", "out", ".turbo", ".cache", ".vercel"]);
 const TEXT_EXT = new Set([
-  ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".json", ".yml", ".yaml",
+  ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".py", ".go", ".json", ".yml", ".yaml",
   ".toml", ".ini", ".cfg", ".conf", ".env", ".txt", ".md", ".html", ".sql", ".sh", ".npmrc",
 ]);
 const NAMED = new Set(["Dockerfile", ".npmrc", "Procfile", ".env"]);
