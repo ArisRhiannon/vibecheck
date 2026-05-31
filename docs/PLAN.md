@@ -16,8 +16,8 @@ AC1.4 binary/huge files skipped safely; missing dir → typed error.
 
 ## Phase 2 — Secrets + env
 AC2.1 detects ≥7 known token formats (AWS, GitHub `ghp_`, OpenAI `sk-`, Stripe `sk_live`, Google
-`AIza`, Slack `xox`, PEM private key). AC2.2 flags high-entropy string assignments (Shannon ≥ ~4.0,
-len ≥ 20) but NOT obvious placeholders (`xxxx`, `your-…`, `process.env.*`, example values). AC2.3 flags
+`AIza`, Slack `xox`, PEM private key). AC2.2 flags high-entropy string assignments (Shannon ≥ ~3.5,
+len ≥ 12) but NOT obvious placeholders (`xxxx`, `your-…`, `process.env.*`, example values). AC2.3 flags
 `.env` that is tracked and not gitignored. AC2.4 flags keys present in `.env` but missing from
 `.env.example` (and vice-versa). AC2.5 safe fixtures (placeholders, env refs) produce no findings.
 

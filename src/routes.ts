@@ -58,11 +58,13 @@ export function routeFindings(files: SourceFile[]): Finding[] {
       if (/PUBLISHABLE|ANON|PUBLIC_KEY/.test(m[0])) continue;
       out.push(mk(f, m.index ?? 0, "VC-NEXT-PUBLIC-SECRET", "high", `${m[0]} is exposed to the browser (every NEXT_PUBLIC_* var is bundled into client JS)`, "Drop the NEXT_PUBLIC_ prefix and read the secret only on the server."));
     }
-    // Supabase service_role key (must never reach the client)
-    const idx = c.search(/service_role/i);
-    if (idx >= 0) {
+    // Supabase service_role key (must never reach the client); ignore comment mentions
+    for (const m of c.matchAll(/service_role/gi)) {
+      const idx = m.index ?? 0;
+      if (/^\s*(?:\/\/|\*|\/\*)/.test(lineAt(c, idx))) continue;
       const client = /['"]use client['"]/.test(c);
       out.push(mk(f, idx, "VC-SUPABASE-SERVICE-ROLE", client ? "critical" : "high", `Supabase service_role key referenced${client ? " in a client component" : ""} — it bypasses Row-Level Security`, "Use the anon key on the client; keep service_role strictly server-side in env."));
+      break;
     }
     // Error stack returned to the client
     for (const m of c.matchAll(/res\s*\.\s*(?:send|json|end)\s*\([^)\n]*\.stack\b/g)) out.push(mk(f, m.index ?? 0, "VC-STACK-EXPOSURE", "medium", "error stack trace sent in the HTTP response", "Log the stack server-side; return a generic error message to clients."));

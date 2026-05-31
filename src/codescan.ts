@@ -33,7 +33,8 @@ function rce(f: SourceFile): Finding[] {
     if (firstArgIsLiteral(c, idx + m[0].length - 1)) continue;
     out.push(mk(f, idx, "VC-RCE-EVAL", "critical", "eval()/new Function() on a non-literal value (remote code execution)", "Never eval dynamic input; use JSON.parse or an explicit dispatch table."));
   }
-  for (const m of c.matchAll(/\b(?:exec|execSync|execFile|execFileSync|spawn|spawnSync)\s*\(/g)) {
+  const CHILD = /(?<![.\w])(?:exec|execSync|execFile|execFileSync|spawn|spawnSync)\s*\(|(?:child_process|cp)\s*\.\s*(?:exec|execSync|execFile|execFileSync|spawn|spawnSync)\s*\(/g;
+  for (const m of c.matchAll(CHILD)) {
     const idx = m.index ?? 0;
     if (firstArgIsLiteral(c, idx + m[0].length - 1)) continue;
     out.push(mk(f, idx, "VC-RCE-CHILD-PROCESS", "high", "child_process call with a non-literal command (command injection)", "Pass a fixed program + args array to execFile; validate/escape any input."));
