@@ -26,4 +26,16 @@ d("Python analyzer (real ast + taint)", () => {
   test("tainted findings are high confidence", () => {
     expect(run("def h():\n    os.system(request.args['c'])")[0]?.confidence).toBe("high");
   });
+  test("intra-file inter-procedural: return-taint and param→sink helpers", () => {
+    expect(has("def get_id():\n    return request.args['id']\ndef h():\n    cursor.execute(get_id())", "VC-PY-SQLI")).toBe(true);
+    expect(has("def run(q):\n    cursor.execute(q)\ndef h():\n    run(request.args['x'])", "VC-PY-SQLI")).toBe(true);
+    expect(run("def clean(q):\n    return int(q)\ndef h():\n    cursor.execute(clean(request.args['id']))").length).toBe(0);
+  });
+  test("cross-file inter-procedural (resolved import): return-taint + param→sink", () => {
+    const sf = (rel: string, content: string) => ({ path: rel, rel, content });
+    const ret = [sf("helpers.py", "def get_input():\n    return request.args['x']\n"), sf("app.py", "from helpers import get_input\ndef h():\n    cursor.execute(get_input())\n")];
+    expect(pythonFindings(ret).some((f) => f.ruleId === "VC-PY-SQLI" && f.file === "app.py")).toBe(true);
+    const ps = [sf("db.py", "def run(q):\n    cursor.execute(q)\n"), sf("app.py", "from db import run\ndef h():\n    run(request.form['x'])\n")];
+    expect(pythonFindings(ps).some((f) => f.ruleId === "VC-PY-SQLI" && f.file === "app.py")).toBe(true);
+  });
 });

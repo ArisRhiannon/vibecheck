@@ -73,6 +73,9 @@ export const CORPUS: Case[] = [
   { name: "py-safe-yaml", rel: "a.py", code: "def h():\n    return yaml.safe_load(blob)", expect: [] },
   { name: "py-tuple-unpack", rel: "a.py", code: "def h():\n    a, b = request.args['a'], 'ok'\n    os.system(a)", expect: ["VC-PY-CMDI"] },
   { name: "py-safe-tuple", rel: "a.py", code: "def h():\n    a, b = 'ok', request.args['b']\n    cursor.execute(a)", expect: [] },
+  { name: "py-ret-helper", rel: "a.py", code: "def get_id():\n    return request.args['id']\ndef h():\n    cursor.execute(get_id())", expect: ["VC-PY-SQLI"] },
+  { name: "py-paramsink-helper", rel: "a.py", code: "def run(q):\n    cursor.execute(q)\ndef h():\n    run(request.args['x'])", expect: ["VC-PY-SQLI"] },
+  { name: "py-ret-sanitized-safe", rel: "a.py", code: "def clean(q):\n    return int(q)\ndef h():\n    cursor.execute(clean(request.args['id']))", expect: [] },
   // Inter-procedural (intra-file) via function summaries
   { name: "ip-sqli-helper", rel: "a.ts", code: "function q(s){ db.query(s); }\nq(req.body.x);", expect: ["VC-SQLI"] },
   { name: "ip-ssrf-helper", rel: "a.ts", code: "const call = (u) => { fetch(u); };\ncall(req.query.url);", expect: ["VC-SSRF"] },
