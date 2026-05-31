@@ -39,7 +39,7 @@ pre-flight** that won't drown an agent in false positives.
 
 ## Measured quality (not claimed)
 
-Against a labeled benchmark of **60 cases** across JS/TS **and** Python (vulnerable + safe + deliberately
+Against a labeled benchmark of **62 cases** across JS/TS **and** Python (vulnerable + safe + deliberately
 tricky-safe), the core detectors score (see [`METRICS.md`](METRICS.md), reproduce with `bun benchmark/run.ts`):
 
 - **Precision 100%**, **Recall 100%**, **F1 100%** on the corpus.

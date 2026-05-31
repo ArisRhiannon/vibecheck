@@ -127,3 +127,16 @@ Confirmed: real @babel/* dependencies (by design for AST-based analysis).
 ---
 
 ## VALIDATION: PASS
+
+
+## v0.2.1 — Python multi-language increment (independent validation: PASS)
+
+An independent validator re-ran the tool and confirmed, with its own adversarial snippets:
+- **Real parser:** `src/python.py` uses the stdlib `ast` (`ast.parse`/`ast.walk`, 0 regex); `src/python.ts` shells to `python3` over stdin.
+- **Taint-backed true positives:** 10/10 self-written vulnerable Python snippets flagged with the correct `VC-PY-*` id at **high** confidence (CMDI, SQLi, RCE eval/exec, deserialize, yaml, SSTI, open-redirect, path).
+- **True negatives:** parameterized `execute`, `subprocess.run([list])`, `yaml.safe_load`, positional tuple-unpack → **zero high/medium** findings (medium-on-non-literal is by design, excluded from `--ci`).
+- **Benchmark:** `bun benchmark/run.ts` → **62 cases, precision/recall/F1 = 100%, 0 FP**, Python rows present.
+- **No JS regression:** `bun test` → 30 pass / 0 fail. **Graceful without python3:** `pythonFindings` returns `[]` (no throw); JS scanning unaffected.
+- **No over-claims:** intra-procedural limit, curated benchmark, python3 requirement, and "not a Semgrep/CodeQL replacement" all stated.
+
+QA (code-reviewer) before this: NEEDS-FIX with 0 P0, 1 P1 (tuple-unpack taint loss) — fixed and regression-tested. Verdict: **VALIDATION: PASS**.
