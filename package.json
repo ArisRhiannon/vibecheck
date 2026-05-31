@@ -1,0 +1,30 @@
+{
+  "name": "vibecheck",
+  "version": "0.1.0",
+  "description": "Offline, zero-dependency, no-AI 'safe to ship?' gate for vibe-coded apps. Finds the mistakes AI coding agents make (unprotected routes, committed secrets, eval-RCE, permissive CORS, weak JWT, missing validation, leaky config). Agent-runnable via CLI/JSON/MCP.",
+  "type": "module",
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "Aris Rhiannon",
+  "homepage": "https://github.com/ArisRhiannon/vibecheck#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/ArisRhiannon/vibecheck.git" },
+  "bugs": { "url": "https://github.com/ArisRhiannon/vibecheck/issues" },
+  "keywords": ["vibe-coding", "security", "sast", "audit", "secrets", "owasp", "ai-generated-code", "agent", "mcp", "llms-txt", "ci", "ship-gate", "zero-dependency", "typescript"],
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "bin": { "vibecheck": "src/cli.ts" },
+  "files": ["src", "docs", "AGENTS.md", "llms.txt", "LICENSE", "README.md"],
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun test"
+  },
+  "engines": { "bun": ">=1.1.0", "node": ">=20" },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/bun": "^1.1.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
