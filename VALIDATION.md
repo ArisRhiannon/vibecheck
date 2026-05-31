@@ -41,7 +41,7 @@
 |----|-----------|----------|
 | AC0.1 | PASS | `bun test` runs 29 tests, exit 0 |
 | AC0.2 | PASS | `tsc --noEmit` strict clean |
-| AC0.3 | PASS | `dependencies: {}`, license = "SEE LICENSE IN LICENSE" |
+| AC0.3 | PASS | `dependencies: {}`, license = "MIT" |
 | AC0.4 | PASS | CI workflow runs install + typecheck + test |
 | AC1.1 | PASS | walk skips node_modules/.git/dist/build/coverage + .gitignore globs (test: `walk.test.ts`) |
 | AC1.2 | PASS | returns files with path, content, `locate(index)→{line,col}` 1-based (test: `walk.test.ts`) |
