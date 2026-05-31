@@ -12,4 +12,8 @@ describe("SSRF requires a server source, not client-side DOM location (corpus-dr
     expect(has("fetch(req.query.url);", "VC-SSRF")).toBe(true);
     expect(has("const u = req.query.url;\nfetch(u);", "VC-SSRF")).toBe(true);
   });
+  test("a DOM-location URL via an intermediate variable is NOT SSRF (validation FP)", () => {
+    expect(has("const host = document.location.hostname;\nfetch('https://' + host + '/api');", "VC-SSRF")).toBe(false);
+    expect(has("const base = window.location.origin;\nfetch(base + '/api');", "VC-SSRF")).toBe(false);
+  });
 });

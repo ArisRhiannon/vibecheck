@@ -60,6 +60,8 @@ The dvpwa true positive is what this iteration set out to close: it needed (a) *
 ## Limitations (read this)
 - **Small, curated repo set (9).** A transparency exercise, not a statistically representative study.
 - **High-confidence only.** `medium`/`review` (excluded from `--ci`) are counted, not triaged.
-- A variable literally named `req`/`request` that is *not* a server request (e.g. an HTTP-client response)
-  could match a source pattern; in concat-SQL that surfaces only as `review` confidence, not in the gate.
+- A variable literally named `req`/`request`/`ctx`/`event` that is *not* a server request (e.g. a local
+  object literal or an HTTP-client response) matches a source pattern by name; an independent audit showed
+  this **can reach `high`** in a direct sink (`db.query("…"+req.body.x)`), not only `review`. Real code
+  rarely names a non-request `req`, but a sound fix needs scope/shadowing analysis — tracked, not yet done.
 - Manual triage by the author — judgement calls (e.g. "test code") are stated, not hidden.

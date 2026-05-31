@@ -246,3 +246,17 @@ Adversarial self-QA (5 cases via the compiled analyzer) + suite:
 - **Honest FNs** (README/ADR-0012): aliased package imports (`import u "…/util"`), packages whose declared name ≠ selector base, multi-return assignments.
 
 All three languages are now inter-procedural **across files/packages**: JS/TS (module resolution + aliases + namespace + multi-hop), Python (import + class-method resolution, multi-framework sources), Go (same-package + unaliased cross-package).
+
+
+## v0.12 — Independent adversarial validation (4 tracks) + fixes
+
+A rigorous, unbiased subagent battery was run with the explicit goal of **breaking** the tool (measurement integrity, false positives, false negatives, code/security). Outcome and actions:
+- **Measurement integrity: SOUND.** Precision/recall/F1 computed correctly; the `review`/advisory exclusion is legitimate (those never gate `--ci`); corpus reproduced exactly from pinned commits; the 10 sampled "safe" cases are genuinely adversarial. Honestly noted: the 91→94-case benchmark is author-curated (a regression suite, expected 100% by construction) and the corpus is small — the README/CORPUS already disclose this.
+- **False positives: 5 real high-confidence FPs found → 4 fixed, 1 documented.**
+  - SSRF via a DOM `location` assigned to a variable (×2) → **fixed**: SSRF now uses a *server-only* taint set (`serverTaintSets`); DOM `location`/`document` no longer count. Server SSRF (direct + via var) still fires. Regression-tested.
+  - Go `http.Redirect` with a fixed-prefix relative / fixed-host target (×2) → **fixed**: ported the relative/fixed-host check to Go. Regression-tested.
+  - A local variable literally named `req` (an object, not a request) → matches a source by name and can reach `high` in a direct sink. **Documented** (above); a sound fix needs scope/shadowing analysis (tracked).
+- **Code/security: NEEDS-FIX (minor).** 0 P0/P1. Fixed: MCP stdin line-buffer now capped (no unbounded-growth OOM on a newline-less flood). **Refuted:** the "symlink-cycle infinite loop in `collectFiles`" finding — empirically `collectFiles` terminates (Node `Dirent` with `withFileTypes` does not follow symlinked dirs); verified, no change made. Remaining P3s (stderr logging, predictable Go-binary temp path, gitignore negation) are backlog.
+- **Result after fixes:** 94-case benchmark 100/100/0FP; 59 tests; corpus unchanged (7 high-confidence, 0 high FP). The independent audit hardened the tool rather than rubber-stamping it.
+
+Note: the deep code-review subagent succeeded this round; the false-negative track returned no output, so FN coverage continues to rely on the documented adversarial self-tests + the corpus.

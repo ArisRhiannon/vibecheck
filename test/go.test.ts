@@ -39,6 +39,14 @@ func h(r *http.Request){ run(r.FormValue("x")) }`, "VC-GO-SQLI")).toBe(true);
 func run(q string){ db.Query(q) }
 func h(){ run("SELECT 1") }`).length).toBe(0);
   });
+  test("Go fixed-prefix relative / fixed-host redirects are NOT flagged (validation FP)", () => {
+    expect(has(`package main
+func h(w http.ResponseWriter, r *http.Request){ http.Redirect(w, r, "/app/"+r.FormValue("n"), 302) }`, "VC-GO-OPEN-REDIRECT")).toBe(false);
+    expect(has(`package main
+func h(w http.ResponseWriter, r *http.Request){ http.Redirect(w, r, "https://mysite.com/"+r.FormValue("p"), 302) }`, "VC-GO-OPEN-REDIRECT")).toBe(false);
+    expect(has(`package main
+func h(w http.ResponseWriter, r *http.Request){ http.Redirect(w, r, r.FormValue("next"), 302) }`, "VC-GO-OPEN-REDIRECT")).toBe(true);
+  });
   test("cross-package resolution (pkg.Func return-taint + param→sink)", () => {
     const sf = (rel: string, content: string) => ({ path: rel, rel, content });
     const ret = [
