@@ -36,4 +36,9 @@ export const RULES: Record<string, { summary: string; fix: string }> = {
   "VC-PY-SSTI": { summary: "render_template_string() with tainted input (server-side template injection).", fix: "Render fixed templates with context vars; never template user input." },
   "VC-PY-OPEN-REDIRECT": { summary: "Python redirect() to a tainted target (open redirect).", fix: "Redirect only to an allowlist of paths/hosts." },
   "VC-PY-PATH": { summary: "Python open()/send_file() with a tainted path (path traversal).", fix: "Resolve against a fixed base dir and reject '..' escapes." },
+  "VC-GO-CMDI": { summary: "Go exec.Command with tainted input (command injection).", fix: "Pass a fixed program + validated args; never build the command from input." },
+  "VC-GO-SQLI": { summary: "Go SQL built from tainted input via db.Query/Exec (SQL injection).", fix: "Use parameterized queries with placeholders ($1/?) and args." },
+  "VC-GO-PATH": { summary: "Go os.Open/ReadFile with a tainted path (path traversal).", fix: "Resolve against a fixed base dir and reject '..'." },
+  "VC-GO-OPEN-REDIRECT": { summary: "Go http.Redirect to a tainted target (open redirect).", fix: "Redirect only to an allowlist of paths/hosts." },
+  "VC-GO-SSRF": { summary: "Go outbound request to a tainted URL (SSRF).", fix: "Validate the URL against a host allowlist; block internal IPs." },
 };

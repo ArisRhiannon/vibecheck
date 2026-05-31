@@ -1,17 +1,21 @@
 # Benchmark metrics
 
-Corpus: **69** labeled cases (vulnerable + safe + tricky-safe). Advisory rules
+Corpus: **75** labeled cases (vulnerable + safe + tricky-safe). Advisory rules
 (`VC-ROUTE-NO-AUTH`, `VC-INPUT-NO-VALIDATION`) and `review`-confidence findings are excluded
 from these core numbers by design (they are advisory, not assertions). Re-run: `bun benchmark/run.ts`.
 
-- **Precision: 100.0%** (TP 40 / FP 0)
-- **Recall: 100.0%** (TP 40 / FN 0)
+- **Precision: 100.0%** (TP 44 / FP 0)
+- **Recall: 100.0%** (TP 44 / FN 0)
 - **F1: 100.0%**
 
 | rule | TP | FP | FN |
 |------|----|----|----|
 | VC-COOKIE-INSECURE | 1 | 0 | 0 |
 | VC-CORS-WILDCARD | 2 | 0 | 0 |
+| VC-GO-CMDI | 1 | 0 | 0 |
+| VC-GO-PATH | 1 | 0 | 0 |
+| VC-GO-SQLI | 1 | 0 | 0 |
+| VC-GO-SSRF | 1 | 0 | 0 |
 | VC-JWT-NONE | 1 | 0 | 0 |
 | VC-JWT-UNPINNED | 1 | 0 | 0 |
 | VC-NEXT-PUBLIC-SECRET | 1 | 0 | 0 |

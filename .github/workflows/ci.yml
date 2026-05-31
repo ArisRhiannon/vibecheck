@@ -12,6 +12,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
       - run: bun install --frozen-lockfile || bun install
       - run: bun run typecheck
       - run: bun test

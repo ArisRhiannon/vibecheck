@@ -6,6 +6,7 @@ import { miscFindings } from "./misc";
 import { pythonFindings } from "./python";
 import { interprocFindings } from "./interproc";
 import { crossFileSummaries } from "./taint";
+import { goFindings } from "./go";
 import { type Finding, type Severity, type Confidence, SEVERITY_ORDER, CONFIDENCE_ORDER } from "./types";
 import type { VibecheckConfig } from "./config";
 
@@ -36,7 +37,7 @@ export function countBySeverity(f: Finding[]): Record<Severity, number> {
 export function scanProject(dir: string, cfg: VibecheckConfig = {}): ScanResult {
   const files = collectFiles(dir);
   const summaries = crossFileSummaries(files);
-  const raw = [...secretFindings(files), ...envFindings(files), ...astFindings(files, summaries), ...miscFindings(files), ...pythonFindings(files), ...interprocFindings(files, summaries)];
+  const raw = [...secretFindings(files), ...envFindings(files), ...astFindings(files, summaries), ...miscFindings(files), ...pythonFindings(files), ...interprocFindings(files, summaries), ...goFindings(files)];
   const ignore = new Set(cfg.ignoreRules ?? []);
   const allow = (cfg.allowPaths ?? []).map(globToRe);
   const seen = new Set<string>();

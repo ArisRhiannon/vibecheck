@@ -82,4 +82,17 @@ export const CORPUS: Case[] = [
   { name: "ret-source-helper", rel: "a.ts", code: "function getInput(){ return req.body.x; }\nconst v = getInput();\ndb.query(v);", expect: ["VC-SQLI"] },
   { name: "ret-passthrough", rel: "a.ts", code: "function wrap(x){ return x; }\nconst v = wrap(req.body.id);\ndb.query(v);", expect: ["VC-SQLI"] },
   { name: "ret-safe-constant", rel: "a.ts", code: "function getId(){ return 42; }\nconst v = getId();\ndb.query(v);", expect: [] },
+  // Go (real go/parser analyzer)
+  { name: "go-cmdi", rel: "a.go", code: `package main
+func h(r *http.Request){ exec.Command("sh", "-c", r.FormValue("c")) }`, expect: ["VC-GO-CMDI"] },
+  { name: "go-sqli", rel: "a.go", code: `package main
+func h(r *http.Request){ q := r.FormValue("id"); db.Query("SELECT " + q) }`, expect: ["VC-GO-SQLI"] },
+  { name: "go-path", rel: "a.go", code: `package main
+func h(r *http.Request){ os.Open(r.FormValue("f")) }`, expect: ["VC-GO-PATH"] },
+  { name: "go-ssrf", rel: "a.go", code: `package main
+func h(r *http.Request){ http.Get(r.FormValue("u")) }`, expect: ["VC-GO-SSRF"] },
+  { name: "go-safe-param", rel: "a.go", code: `package main
+func h(r *http.Request){ id, _ := strconv.Atoi(r.FormValue("id")); db.Query("SELECT * WHERE id=$1", id) }`, expect: [] },
+  { name: "go-safe-fixed", rel: "a.go", code: `package main
+func h(){ exec.Command("ls", "-la") }`, expect: [] },
 ];

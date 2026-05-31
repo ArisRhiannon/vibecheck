@@ -1,12 +1,12 @@
 import { writeFileSync } from "node:fs";
 import { CORPUS, type Case } from "./corpus";
-import { astFindings, miscFindings, pythonFindings, interprocFindings, type SourceFile } from "../src/index";
+import { astFindings, miscFindings, pythonFindings, interprocFindings, goFindings, type SourceFile } from "../src/index";
 
 const ADVISORY = new Set(["VC-ROUTE-NO-AUTH", "VC-INPUT-NO-VALIDATION"]);
 
 function emittedIds(c: Case): Set<string> {
   const f: SourceFile = { path: c.rel, rel: c.rel, content: c.code };
-  const found = [...astFindings([f]), ...miscFindings([f]), ...pythonFindings([f]), ...interprocFindings([f])];
+  const found = [...astFindings([f]), ...miscFindings([f]), ...pythonFindings([f]), ...interprocFindings([f]), ...goFindings([f])];
   return new Set(found.filter((x) => x.confidence !== "review" && !ADVISORY.has(x.ruleId)).map((x) => x.ruleId));
 }
 
