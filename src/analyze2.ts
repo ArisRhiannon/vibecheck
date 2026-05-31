@@ -66,7 +66,7 @@ export function astFindings(files: SourceFile[]): Finding[] {
           const queryApi = m === "query" || m === "execute";
           if ((rawApi || queryApi) && arg0 && !literalish(arg0)) {
             if (tainted(arg0)) mk(node, "VC-SQLI", "critical", "high", `SQL via ${m}() built from tainted input (SQL injection)`, "Use parameterized queries / bound placeholders; never interpolate user input.");
-            else if (t.isTemplateLiteral(arg0) || (t.isBinaryExpression(arg0) && arg0.operator === "+")) mk(node, "VC-SQLI", "high", "medium", `SQL via ${m}() built by string interpolation/concatenation`, "Use parameterized queries / bound placeholders.");
+            else if (t.isTemplateLiteral(arg0) || (t.isBinaryExpression(arg0) && arg0.operator === "+")) mk(node, "VC-SQLI", "medium", "review", `SQL via ${m}() built by interpolation/concatenation (verify the values are not user-controlled)`, "Prefer parameterized queries / bound placeholders.");
           }
         }
         // SSRF: fetch/axios/got/http(s).get with tainted URL
