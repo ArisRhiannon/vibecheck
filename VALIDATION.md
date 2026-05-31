@@ -179,3 +179,15 @@ An independent validator confirmed, with its own Go snippets and the running too
 - **Honest:** README/llms.txt/ADR-0007 state Go needs a `go` toolchain, intra-procedural, multi-return FN, `.Do` dropped; "not a Semgrep/CodeQL replacement".
 
 QA (code-reviewer): **NEEDS-FIX → fixed** (P1 parameterized-bind-param FP; P2 `.Do` SSRF FP; P3 doc). Verdict: **VALIDATION: PASS**.
+
+
+## v0.6 — Real-world corpus + corpus-driven fix (validated)
+
+Independent validation (validator re-ran the harness **with network**):
+- **Corpus reproducible:** 5 pinned repos (express 4.21.2, fastify v4.28.1, NodeGoat @ full SHA, flask 3.0.3, gin v1.10.0); per-repo high-confidence counts match `docs/CORPUS.md` exactly (express 1, fastify 0, NodeGoat 4, flask 1, gin 0); SHAs recorded.
+- **Honest report:** separates **detector precision 6/6** from **production-exploitable 4/6**; discloses small sample, high-confidence-only scope, author triage; the test-code/`.env`-fixture classifications were independently confirmed by opening the cited files; transparently reports the **1 real false positive the corpus found and fixed**.
+- **Security fix sound (no FN):** `res.redirect('/'+req.query.x)` (→ `//evil.com` protocol-relative) and `res.redirect('//'+x)` still **fire**; `res.redirect(req.query.url)` fires; fixed-prefix `'/user/'+id` and `` `/dashboard/${tab}` `` are correctly silent.
+- **No regression:** `bun test` 48/48; `bun benchmark/run.ts` 78 cases, 100/100, 0 FP.
+- **No over-claims:** README qualifies the 100% as the **curated** number and points to `docs/CORPUS.md` for the real-world measurement; still "not a Semgrep/CodeQL replacement; not a proof of security".
+
+QA (code-reviewer): **NEEDS-FIX → fixed** — **P1** protocol-relative bypass (`'/'+input`) closed + regression test; **P2** NodeGoat pinned by SHA; clone-failure recorded. Verdict: **VALIDATION: PASS**.
