@@ -102,8 +102,9 @@ Taint-backed: `VC-RCE-EVAL`, `VC-RCE-CHILD-PROCESS`, `VC-SQLI`, `VC-XSS-REACT`, 
   `import mod`; not resolved: `import a.b` dotted-unaliased, `*`/re-exports, decorators). Python request
   **sources** span Flask, Django, **aiohttp** (`request.match_info`, `await request.post()`), FastAPI/
   Starlette (`request.query_params`/`path_params`, `await request.json()/form()`), Tornado, Bottle, Pyramid. **Go** is
-  inter-procedural **within a package** (return-taint + param→sink, same-package by function name);
-  cross-package `pkg.Func` calls and multi-return assignments (`x, _ := f(src)`) are not tracked.
+  inter-procedural **within and across packages** (return-taint + param→sink; unaliased `pkg.Func`
+  resolves by package name). Aliased package imports (`import u "…/util"`) and multi-return assignments
+  (`x, _ := f(src)`) are not tracked.
 - Config/secret rules are pattern-based where AST adds no value.
 - A high-signal gate and early-warning — **not a proof of security**. Pair it with Semgrep/CodeQL and review.
 

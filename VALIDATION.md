@@ -235,3 +235,14 @@ The real-world corpus **found a critical bug**: `collectFiles` (the `scanProject
 - **No regression:** `bun test` 56/56; `bun benchmark/run.ts` 91 cases, precision/recall 100%, 0 FP.
 
 QA: the code-reviewer subagent was unavailable; QA was performed via the adversarial self-test above and the full corpus triage, recorded here for scrutiny.
+
+
+## v0.11 — Go cross-package resolution (validated)
+
+Adversarial self-QA (5 cases via the compiled analyzer) + suite:
+- **True positives:** cross-package return-taint (`q := util.GetInput(r); db.Query(q)`) and param→sink (`store.Run(r.FormValue("x"))` where `store.Run` reaches `database.Query`) — both fire VC-GO-SQLI on the calling file; same-package still works.
+- **True negatives (0 FP):** `logger.Run(taint)` where `logger` is not a scanned package → no resolution → silent; a cross-package helper that **parameterizes** (`database.Query("$1", q)`) → silent.
+- **No regression:** `bun test` 57/57; `bun benchmark/run.ts` 91 cases, precision/recall 100%, 0 FP.
+- **Honest FNs** (README/ADR-0012): aliased package imports (`import u "…/util"`), packages whose declared name ≠ selector base, multi-return assignments.
+
+All three languages are now inter-procedural **across files/packages**: JS/TS (module resolution + aliases + namespace + multi-hop), Python (import + class-method resolution, multi-framework sources), Go (same-package + unaliased cross-package).

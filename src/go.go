@@ -92,11 +92,19 @@ func retTainted(e ast.Expr, set map[string]bool, pkg string) bool {
 	case *ast.ParenExpr:
 		return retTainted(v.X, set, pkg)
 	case *ast.CallExpr:
-		id, ok := v.Fun.(*ast.Ident)
-		if !ok {
+		var k key
+		if id, ok := v.Fun.(*ast.Ident); ok {
+			k = key{pkg, id.Name}
+		} else if sel, ok := v.Fun.(*ast.SelectorExpr); ok {
+			if x, ok2 := sel.X.(*ast.Ident); ok2 {
+				k = key{x.Name, sel.Sel.Name} // cross-package: pkg.Func (selector base == package name)
+			} else {
+				return false
+			}
+		} else {
 			return false
 		}
-		s := summaries[key{pkg, id.Name}]
+		s := summaries[k]
 		if s == nil {
 			return false
 		}
@@ -365,8 +373,17 @@ func analyze(fset *token.FileSet, file *ast.File, path string, out *[]Finding) {
 			for _, h := range sinkHits(c, T) {
 				add(c, h)
 			}
+			var sk key
+			resolved := false
 			if id, ok := c.Fun.(*ast.Ident); ok {
-				if s := summaries[key{pkg, id.Name}]; s != nil {
+				sk, resolved = key{pkg, id.Name}, true
+			} else if sel, ok := c.Fun.(*ast.SelectorExpr); ok {
+				if x, ok2 := sel.X.(*ast.Ident); ok2 {
+					sk, resolved = key{x.Name, sel.Sel.Name}, true
+				}
+			}
+			if resolved {
+				if s := summaries[sk]; s != nil {
 					for _, ps := range s.psinks {
 						if ps.param < len(c.Args) && T(c.Args[ps.param]) {
 							add(c, ps.hit)

@@ -39,4 +39,24 @@ func h(r *http.Request){ run(r.FormValue("x")) }`, "VC-GO-SQLI")).toBe(true);
 func run(q string){ db.Query(q) }
 func h(){ run("SELECT 1") }`).length).toBe(0);
   });
+  test("cross-package resolution (pkg.Func return-taint + param→sink)", () => {
+    const sf = (rel: string, content: string) => ({ path: rel, rel, content });
+    const ret = [
+      sf("util/util.go", `package util
+import "net/http"
+func GetInput(r *http.Request) string { return r.FormValue("x") }`),
+      sf("main.go", `package main
+import ("net/http"; "x/util")
+func h(r *http.Request){ q := util.GetInput(r); db.Query(q) }`),
+    ];
+    expect(goFindings(ret).some((f) => f.ruleId === "VC-GO-SQLI" && f.file === "main.go")).toBe(true);
+    const ps = [
+      sf("store/store.go", `package store
+func Run(q string){ database.Query(q) }`),
+      sf("main.go", `package main
+import ("net/http"; "x/store")
+func h(r *http.Request){ store.Run(r.FormValue("x")) }`),
+    ];
+    expect(goFindings(ps).some((f) => f.ruleId === "VC-GO-SQLI" && f.file === "main.go")).toBe(true);
+  });
 });
