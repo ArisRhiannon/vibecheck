@@ -4,8 +4,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A fast, **agent-native** "safe to ship?" gate for vibe-coded apps. It parses your **JS/TS/JSX/TSX**
-(`@babel/parser`) and **Python** (the stdlib `ast`) with **real parsers** and uses **intra-procedural
-taint analysis** to flag the security classes AI coding agents get wrong — committed secrets, SQL
+(`@babel/parser`) and **Python** (the stdlib `ast`) with **real parsers** and uses **taint analysis**
+(inter-procedural within a file for JS/TS) to flag the security classes AI coding agents get wrong — committed secrets, SQL
 injection through *abstracted* raw-query APIs, XSS, SSRF, path traversal, command injection, insecure
 deserialization, weak JWT/CORS/cookies — and ranks every finding by **confidence** so an agent can fix
 the real ones and ignore the noise.
@@ -28,7 +28,7 @@ loops and pre-commit in milliseconds**, with **published precision/recall** so y
 | | vibecheck | Semgrep | CodeQL |
 |--|--|--|--|
 | Parsing | real AST (Babel JS/TS/JSX + Python `ast`) | real, many langs | real, many langs |
-| Data-flow | intra-procedural taint | taint (Pro) | full inter-procedural |
+| Data-flow | intra-file inter-procedural (1-level summaries) | taint (Pro) | full inter-procedural |
 | Languages (v0.2) | **JS/TS/JSX/TSX + Python** | many | many |
 | Speed / infra | ms, local, no account | fast | slower, CI-oriented |
 | Agent-native (MCP, confidence gating) | **yes, first-class** | partial | no |
@@ -88,7 +88,9 @@ Taint-backed: `VC-RCE-EVAL`, `VC-RCE-CHILD-PROCESS`, `VC-SQLI`, `VC-XSS-REACT`, 
 
 - **JS/TS/JSX/TSX + Python** in v0.2 (Python needs `python3` on PATH). More languages are roadmap (via
   each language's own real parser / tree-sitter, never hand-rolled).
-- **Intra-procedural** taint: flow across functions/files/modules is not tracked (false negatives there).
+- **Taint scope:** JS/TS is **intra-file inter-procedural** (1-level function summaries — a parameter that
+  reaches a sink is flagged at tainted call sites, sanitizers respected); Python is intra-procedural.
+  Cross-**file**/module flow, helper→helper chains, and return-taint are not tracked (false negatives there).
 - Config/secret rules are pattern-based where AST adds no value.
 - A high-signal gate and early-warning — **not a proof of security**. Pair it with Semgrep/CodeQL and review.
 

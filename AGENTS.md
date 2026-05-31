@@ -24,7 +24,7 @@ Or over MCP (stdio): start `vibecheck mcp` and call the `scan` tool with `{ "dir
    meant to be public, or add an auth check.
 
 ## Honesty
-vibecheck parses a real AST and runs intra-procedural taint analysis; findings are confidence-ranked
+vibecheck parses a real AST and runs taint analysis (intra-file inter-procedural for JS/TS); findings are confidence-ranked
 (`high` = a user-input source provably reaches the sink). It is a strong, low-false-positive gate for
 the AI-vibe-coding failure classes — **not** a proof of security and **not** a replacement for
 Semgrep/CodeQL (run those too for breadth). Fix every `high`-confidence finding; treat `review` as a
