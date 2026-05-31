@@ -8,3 +8,4 @@ export * from "./config";
 export * from "./engine";
 export * from "./report";
 export * from "./catalog";
+export * from "./mcp";
