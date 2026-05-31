@@ -269,3 +269,12 @@ The independent FN subagent had returned no output, so a rigorous FN sweep was r
   - `AKIAIOSFODNN7EXAMPLE` (canonical AWS docs key) → **correctly excluded** by design (`/XXXX|EXAMPLE|REDACTED/` guard prevents docs/placeholder FPs); a real `AKIA…` key fires high. Mis-chosen test, not a bug.
   - **Real FN found:** an **inline** call to a return-tainting helper used directly as a sink arg — `db.query(gi(req))` (vs the via-variable form which already worked). **Fixed**: analyze2's taint check now also resolves inline return-tainting calls via the file summaries. Regression-tested (benchmark `ret-inline-helper` + unit test); the corrected sweep now fires high on all real vulns.
 - After the fix: 95-case benchmark 100/100/0FP; 60 tests; corpus unchanged.
+
+
+## v0.14 — FP3 fixed at the root (scope-aware sources)
+
+The last known high-confidence false positive from the v0.12 audit — a local variable literally named `req`/`request`/`ctx`/`event` that is an object/array/literal (not a server request) matching a source by name — is now **fixed at the root** for JS/TS, without threading through the validated taint core:
+- `markShadowedSources(file)` tags member nodes rooted at such a locally-bound name (via `const/let/var = {…}/[…]/literal` or `=` assignment); `isSourceExpr` skips the request-source for tagged nodes. Applied at all three parse sites (astFindings, interproc, crossFileSummaries) on the shared cached AST.
+- **Verified:** `const req = {body:{}}; db.query("…"+req.body.name)` → at most `review` (out of the gate), not `high`; a real `req` **parameter** still fires `high`; `let req; req = {…}` also guarded.
+- **Zero regression:** 96-case benchmark 100/100/0FP; 61 tests; corpus unchanged (7 high-confidence, dvpwa still a true positive, 0 new FPs). `isTainted`/`taintedAt`/`buildTaintSets` signatures unchanged.
+- Residual: the same name-collision is theoretically possible in the Python/Go analyzers (rarer) and is not yet scope-guarded — documented.

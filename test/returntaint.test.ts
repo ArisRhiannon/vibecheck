@@ -17,6 +17,11 @@ describe("return-taint (intra-file inter-procedural)", () => {
   test("an inline call to a return-tainting helper as a sink arg fires (FN regression)", () => {
     expect(has("function gi(req){ return req.body.x; }\ndb.query(gi(req));", "VC-SQLI")).toBe(true);
   });
+  test("a locally-shadowed `req` (object literal, not a request) is not a high-confidence source (FP3)", () => {
+    const hiSqli = (c: string) => astFindings([{ path: "a.ts", rel: "a.ts", content: c }]).some((f) => f.ruleId === "VC-SQLI" && f.confidence === "high");
+    expect(hiSqli("const req = {body:{}};\ndb.query('SELECT ' + req.body.name);")).toBe(false);
+    expect(hiSqli("module.exports = (req) => db.query('SELECT ' + req.body.id);")).toBe(true);
+  });
   test("a sanitizing helper (returns Number(x)) does not taint", () => {
     expect(has("function toId(x){ return Number(x); }\nconst v = toId(req.body.id);\ndb.query(v);", "VC-SQLI")).toBe(false);
   });

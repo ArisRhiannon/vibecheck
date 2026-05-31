@@ -26,7 +26,7 @@ export function isSourceExpr(node: t.Node | null | undefined): boolean {
   if (t.isMemberExpression(node) || t.isOptionalMemberExpression(node)) {
     const p = memberPath(node);
     if (p) {
-      if (REQ.test(p)) return true;
+      if (REQ.test(p) && !(node as { _vcShadow?: boolean })._vcShadow) return true;
       if (/^location\b/.test(p) || /^(?:document|window)\.location\b/.test(p)) return true;
       if (/^process\.argv\b/.test(p)) return true;
       if (/\.nextUrl\.searchParams\b/.test(p)) return true;
@@ -38,6 +38,27 @@ export function isSourceExpr(node: t.Node | null | undefined): boolean {
     if (p && (REQ_CALL.test(p) || /\.searchParams\.get$/.test(p))) return true;
   }
   return false;
+}
+
+const REQ_ROOT = /^(?:req|request|ctx|event)$/;
+function memberRoot(node: t.Node): string | null {
+  let o: t.Node = node;
+  while (t.isMemberExpression(o) || t.isOptionalMemberExpression(o)) o = o.object;
+  return t.isIdentifier(o) ? o.name : null;
+}
+
+/** Tag member nodes rooted at a `req`/`request`/`ctx`/`event` that is LOCALLY bound to a non-request
+ *  value (object/array/literal), so isSourceExpr won't treat them as a request source (scope-aware). */
+export function markShadowedSources(file: t.File): void {
+  const shadow = new Set<string>();
+  const local = (e: t.Node | null | undefined) => !!e && (t.isObjectExpression(e) || t.isArrayExpression(e) || t.isStringLiteral(e) || t.isNumericLiteral(e) || t.isTemplateLiteral(e));
+  traverse(file, {
+    VariableDeclarator(path) { if (t.isIdentifier(path.node.id) && REQ_ROOT.test(path.node.id.name) && local(path.node.init)) shadow.add(path.node.id.name); },
+    AssignmentExpression(path) { if (path.node.operator === "=" && t.isIdentifier(path.node.left) && REQ_ROOT.test(path.node.left.name) && local(path.node.right)) shadow.add(path.node.left.name); },
+  });
+  if (!shadow.size) return;
+  const mark = (path: NodePath<t.MemberExpression | t.OptionalMemberExpression>) => { const r = memberRoot(path.node); if (r && shadow.has(r)) (path.node as { _vcShadow?: boolean })._vcShadow = true; };
+  traverse(file, { MemberExpression: mark, OptionalMemberExpression: mark });
 }
 
 const NUMERIC = new Set(["Number", "parseInt", "parseFloat", "BigInt"]);
@@ -275,6 +296,7 @@ export function crossFileSummaries(files: SourceFile[]): Map<string, Summaries> 
     if (!JS_SUM.test(f.rel)) continue;
     const ast = parseFile(f.content, f.rel);
     if (!ast) continue;
+    markShadowedSources(ast);
     parsed.set(f.rel, ast);
     local.set(f.rel, buildSummaries(ast));
   }

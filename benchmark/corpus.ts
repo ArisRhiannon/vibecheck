@@ -91,6 +91,7 @@ export const CORPUS: Case[] = [
   { name: "ret-passthrough", rel: "a.ts", code: "function wrap(x){ return x; }\nconst v = wrap(req.body.id);\ndb.query(v);", expect: ["VC-SQLI"] },
   { name: "ret-safe-constant", rel: "a.ts", code: "function getId(){ return 42; }\nconst v = getId();\ndb.query(v);", expect: [] },
   { name: "ret-inline-helper", rel: "a.ts", code: "function gi(req){ return req.body.x; }\ndb.query(gi(req));", expect: ["VC-SQLI"] },
+  { name: "fp-local-req-object-safe", rel: "a.ts", code: "const req = {body:{name:'x'}};\ndb.query('SELECT ' + req.body.name);", expect: [] },
   // Go (real go/parser analyzer)
   { name: "go-cmdi", rel: "a.go", code: `package main
 func h(r *http.Request){ exec.Command("sh", "-c", r.FormValue("c")) }`, expect: ["VC-GO-CMDI"] },

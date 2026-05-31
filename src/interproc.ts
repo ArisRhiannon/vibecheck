@@ -1,6 +1,6 @@
 import { type SourceFile, type Finding, type Severity } from "./types";
 import { parseFile, traverse, t } from "./ast";
-import { buildTaintSets, buildSummaries, taintedAt, isTainted, isSourceExpr, resolveImports, type Summaries } from "./taint";
+import { buildTaintSets, buildSummaries, taintedAt, isTainted, isSourceExpr, resolveImports, markShadowedSources, type Summaries } from "./taint";
 
 const JS = /\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
 const CP = new Set(["exec", "execSync", "execFile", "execFileSync", "spawn", "spawnSync"]);
@@ -63,6 +63,7 @@ export function interprocFindings(files: SourceFile[], summariesByRel?: Map<stri
     if (!JS.test(f.rel)) continue;
     const ast = parseFile(f.content, f.rel);
     if (!ast) continue;
+    markShadowedSources(ast);
     const fns = new Map<string, { node: t.Function; params: (string | null)[] }>();
     const assignsByFn = new Map<t.Node, Array<{ names: string[]; expr: t.Node | null | undefined }>>();
     const sinksByFn = new Map<t.Node, Sink[]>();

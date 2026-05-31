@@ -1,6 +1,6 @@
 import { type SourceFile, type Finding, type Severity, type Confidence } from "./types";
 import { parseFile, traverse, t, type NodePath } from "./ast";
-import { buildTaintSets, buildSummaries, returnTainted, taintedAt, isSourceExpr, memberPath, type Summaries } from "./taint";
+import { buildTaintSets, buildSummaries, returnTainted, taintedAt, isSourceExpr, memberPath, markShadowedSources, type Summaries } from "./taint";
 
 const JS = /\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
 const CP = new Set(["exec", "execSync", "execFile", "execFileSync", "spawn", "spawnSync"]);
@@ -102,6 +102,7 @@ export function astFindings(files: SourceFile[], summariesByRel?: Map<string, Su
     if (!JS.test(f.rel)) continue;
     const ast = parseFile(f.content, f.rel);
     if (!ast) continue;
+    markShadowedSources(ast);
     const summaries = summariesByRel?.get(f.rel) ?? buildSummaries(ast);
     const sets = buildTaintSets(ast, summaries);
     const serverSets = serverTaintSets(ast);

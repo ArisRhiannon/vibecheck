@@ -1,6 +1,6 @@
 # Benchmark metrics
 
-Corpus: **95** labeled cases (vulnerable + safe + tricky-safe). Advisory rules
+Corpus: **96** labeled cases (vulnerable + safe + tricky-safe). Advisory rules
 (`VC-ROUTE-NO-AUTH`, `VC-INPUT-NO-VALIDATION`) and `review`-confidence findings are excluded
 from these core numbers by design (they are advisory, not assertions). Re-run: `bun benchmark/run.ts`.
 

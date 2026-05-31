@@ -60,8 +60,9 @@ The dvpwa true positive is what this iteration set out to close: it needed (a) *
 ## Limitations (read this)
 - **Small, curated repo set (9).** A transparency exercise, not a statistically representative study.
 - **High-confidence only.** `medium`/`review` (excluded from `--ci`) are counted, not triaged.
-- A variable literally named `req`/`request`/`ctx`/`event` that is *not* a server request (e.g. a local
-  object literal or an HTTP-client response) matches a source pattern by name; an independent audit showed
-  this **can reach `high`** in a direct sink (`db.query("…"+req.body.x)`), not only `review`. Real code
-  rarely names a non-request `req`, but a sound fix needs scope/shadowing analysis — tracked, not yet done.
+- A variable literally named `req`/`request`/`ctx`/`event` that is *not* a server request: **fixed for
+  JS/TS** — a member rooted at such a name when it's *locally bound* to an object/array/literal is no
+  longer treated as a source (scope-aware), so `const req = {…}; db.query("…"+req.body.x)` is at most
+  `review`, not `high`; a real `req` **parameter** still works. The same name-collision is theoretically
+  possible in Python/Go (rarer there) and is not yet scope-guarded.
 - Manual triage by the author — judgement calls (e.g. "test code") are stated, not hidden.
