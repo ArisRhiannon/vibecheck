@@ -12,6 +12,19 @@ function literalish(node: t.Node): boolean {
   return t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node) || (t.isTemplateLiteral(node) && node.expressions.length === 0);
 }
 
+/** Leftmost string-literal prefix of a `+`/template expression, if any (for relative-path detection). */
+function leadingLiteral(node: t.Node): string | null {
+  if (t.isStringLiteral(node)) return node.value;
+  if (t.isTemplateLiteral(node) && node.quasis[0]) return node.quasis[0].value.cooked ?? node.quasis[0].value.raw;
+  if (t.isBinaryExpression(node) && node.operator === "+") return leadingLiteral(node.left as t.Node);
+  return null;
+}
+/** A redirect target that starts with a fixed "/path" (not "//host") stays same-site → not an open redirect. */
+function isRelativeRedirect(node: t.Node): boolean {
+  const p = leadingLiteral(node);
+  return p !== null && p.startsWith("/") && !p.startsWith("//");
+}
+
 /** Find an object-expression argument and return a property's value node by key, if present. */
 function prop(obj: t.Node | undefined, key: string): t.Node | undefined {
   if (!obj || !t.isObjectExpression(obj)) return undefined;
@@ -81,7 +94,7 @@ export function astFindings(files: SourceFile[], summariesByRel?: Map<string, Su
           mk(node, "VC-PATH-TRAVERSAL", "high", "high", "filesystem path built from tainted input (path traversal)", "Resolve against a fixed base dir and reject paths that escape it (no '..').");
         }
         // Open redirect
-        if (t.isMemberExpression(callee) && t.isIdentifier(callee.property) && (callee.property.name === "redirect" || callee.property.name === "location") && tainted(arg0)) {
+        if (t.isMemberExpression(callee) && t.isIdentifier(callee.property) && (callee.property.name === "redirect" || callee.property.name === "location") && tainted(arg0) && arg0 && !isRelativeRedirect(arg0)) {
           mk(node, "VC-OPEN-REDIRECT", "medium", "high", "redirect target is tainted (open redirect)", "Redirect only to a fixed allowlist of paths/hosts.");
         }
         // document.write(tainted) → XSS
