@@ -38,4 +38,19 @@ d("Python analyzer (real ast + taint)", () => {
     const ps = [sf("db.py", "def run(q):\n    cursor.execute(q)\n"), sf("app.py", "from db import run\ndef h():\n    run(request.form['x'])\n")];
     expect(pythonFindings(ps).some((f) => f.ruleId === "VC-PY-SQLI" && f.file === "app.py")).toBe(true);
   });
+  test("multi-framework request sources (aiohttp/Django/Starlette/Tornado)", () => {
+    expect(has("async def h(request):\n    cursor.execute(f\"SELECT {request.match_info['id']}\")", "VC-PY-SQLI")).toBe(true);
+    expect(has("def h(request):\n    cursor.execute('SELECT ' + request.GET['id'])", "VC-PY-SQLI")).toBe(true);
+    expect(has("async def h(request):\n    cursor.execute(f\"SELECT {request.query_params['q']}\")", "VC-PY-SQLI")).toBe(true);
+    expect(has("class V:\n    def get(self):\n        cursor.execute('SELECT ' + self.request.GET['id'])", "VC-PY-SQLI")).toBe(true);
+    expect(run("def h(request):\n    uid = int(request.match_info['id'])\n    cursor.execute('SELECT %s', [uid])").length).toBe(0);
+  });
+  test("class @staticmethod cross-file resolution (layered apps, dvpwa pattern)", () => {
+    const sf = (rel: string, content: string) => ({ path: rel, rel, content });
+    const files = [
+      sf("dao/student.py", "class Student:\n    @staticmethod\n    async def create(conn, name):\n        q = (\"INSERT INTO s (name) VALUES ('%(name)s')\" % {'name': name})\n        await conn.cursor().execute(q)\n"),
+      sf("views.py", "from dao.student import Student\nasync def add(request, conn):\n    data = await request.post()\n    await Student.create(conn, data.get('name'))\n"),
+    ];
+    expect(pythonFindings(files).some((f) => f.ruleId === "VC-PY-SQLI" && f.file === "views.py")).toBe(true);
+  });
 });

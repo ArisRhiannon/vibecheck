@@ -76,6 +76,11 @@ export const CORPUS: Case[] = [
   { name: "py-ret-helper", rel: "a.py", code: "def get_id():\n    return request.args['id']\ndef h():\n    cursor.execute(get_id())", expect: ["VC-PY-SQLI"] },
   { name: "py-paramsink-helper", rel: "a.py", code: "def run(q):\n    cursor.execute(q)\ndef h():\n    run(request.args['x'])", expect: ["VC-PY-SQLI"] },
   { name: "py-ret-sanitized-safe", rel: "a.py", code: "def clean(q):\n    return int(q)\ndef h():\n    cursor.execute(clean(request.args['id']))", expect: [] },
+  { name: "py-aiohttp-matchinfo", rel: "a.py", code: "async def h(request):\n    cursor.execute(f\"SELECT {request.match_info['id']}\")", expect: ["VC-PY-SQLI"] },
+  { name: "py-aiohttp-post", rel: "a.py", code: "async def h(request):\n    data = await request.post()\n    cursor.execute('SELECT ' + data.get('x'))", expect: ["VC-PY-SQLI"] },
+  { name: "py-django-get", rel: "a.py", code: "def h(request):\n    cursor.execute('SELECT ' + request.GET['id'])", expect: ["VC-PY-SQLI"] },
+  { name: "py-starlette-queryparams", rel: "a.py", code: "async def h(request):\n    cursor.execute(f\"SELECT {request.query_params['q']}\")", expect: ["VC-PY-SQLI"] },
+  { name: "py-safe-int-matchinfo", rel: "a.py", code: "def h(request):\n    uid = int(request.match_info['id'])\n    cursor.execute('SELECT %s', [uid])", expect: [] },
   // Inter-procedural (intra-file) via function summaries
   { name: "ip-sqli-helper", rel: "a.ts", code: "function q(s){ db.query(s); }\nq(req.body.x);", expect: ["VC-SQLI"] },
   { name: "ip-ssrf-helper", rel: "a.ts", code: "const call = (u) => { fetch(u); };\ncall(req.query.url);", expect: ["VC-SSRF"] },
