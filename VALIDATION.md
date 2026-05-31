@@ -1,136 +1,129 @@
-# VALIDATION.md
+# VALIDATION — vibecheck v0.2
 
-**Date**: 2026-05-31T03:10Z  
-**Validator**: Independent automated validator (Kiro CLI)  
-**Project**: vibecheck v0.1.0
-
----
-
-## Build & Infrastructure Results
-
-| Check | Result | Evidence |
-|-------|--------|----------|
-| `bun run typecheck` | ✅ PASS | `tsc --noEmit` exit 0, zero errors |
-| `bun test` | ✅ PASS | 29 tests, 0 failures, 84 expect() calls, 323ms |
-| Zero runtime deps | ✅ PASS | `package.json .dependencies` = `{}` |
-| License field | ✅ PASS | `"license": "MIT"` |
-| LICENSE file | ✅ PASS | Contains the MIT License text |
-| CI workflow | ✅ PASS | `.github/workflows/ci.yml` runs install + typecheck + test |
-| ADRs | ✅ PASS | 2 ADRs: `0001-heuristic-scanning.md`, `0002-agent-first.md` |
+**Date:** 2026-05-31T03:59Z  
+**Validator:** Independent automated validator (Kiro)  
+**Commit:** HEAD on main branch
 
 ---
 
-## Success Criteria (SC1–SC8)
+## Build & Test Results
 
-| SC | PASS/FAIL | Evidence |
-|----|-----------|----------|
-| SC1 | PASS | `walk.test.ts`: skips node_modules/.git/dist/build/coverage, honors .gitignore globs, returns content + `locate()` helper (1-based line/col). Binary/huge files skipped. Missing dir → VibecheckError. |
-| SC2 | PASS | `secrets.test.ts`: detects AWS, GitHub, OpenAI, Slack, PEM, Stripe, Google (7 formats) + high-entropy. Flags committed `.env`. Drift detection works. Safe fixtures (placeholders, `process.env.*`) produce zero findings. |
-| SC3 | PASS | `codescan.test.ts` AC3.1: `eval(userInput)` fires, `eval("2 + 2")` does not. `execSync(cmd)` fires, `execSync("ls -la")` does not. |
-| SC4 | PASS | `codescan.test.ts` AC3.2: template-interpolated SQL fires, parameterized does not. Concat SQL fires. |
-| SC5 | PASS | `codescan.test.ts` AC3.3–3.5: CORS `*` fires (high w/ credentials), JWT none/unpinned fire, cookie without secure fires. Hardened versions clean. |
-| SC6 | PASS | `routes.test.ts` AC4.1–4.5: unauthed routes → review; no-validator → medium; NEXT_PUBLIC secret → high; service_role → critical in client; stack exposure → medium. Safe variants clean. |
-| SC7 | PASS | `e2e.test.ts` + independent CLI run: `--ci` vuln=exit 1, clean=exit 0; `--json` parseable with critical>0; `explain VC-RCE-EVAL` exit 0; `explain NOPE` exit 2; `.vibecheck.json` ignoreRules honored. |
-| SC8 | PASS | `mcp.test.ts` + independent MCP exercise: `initialize` → serverInfo.name="vibecheck"; `tools/list` → scan tool; `tools/call` → findings JSON with VC-RCE-EVAL. Ships AGENTS.md + llms.txt. README rule table == catalog == detectors (24 rules, exact match). 2 ADRs. Zero deps. tsc strict clean. |
+### `bun run typecheck`
+```
+$ tsc --noEmit
+(exit 0 — no errors)
+```
 
----
+### `bun test`
+```
+26 pass, 0 fail, 87 expect() calls
+Ran 26 tests across 7 files. [1.89s]
+```
 
-## Acceptance Criteria (AC0.1–AC6.4)
+### `bun benchmark/run.ts`
+```
+Corpus: 47 labeled cases (vulnerable + safe + tricky-safe)
+- Precision: 100.0% (TP 26 / FP 0)
+- Recall: 100.0% (TP 26 / FN 0)
+- F1: 100.0%
 
-| AC | PASS/FAIL | Evidence |
-|----|-----------|----------|
-| AC0.1 | PASS | `bun test` runs 29 tests, exit 0 |
-| AC0.2 | PASS | `tsc --noEmit` strict clean |
-| AC0.3 | PASS | `dependencies: {}`, license = "MIT" |
-| AC0.4 | PASS | CI workflow runs install + typecheck + test |
-| AC1.1 | PASS | walk skips node_modules/.git/dist/build/coverage + .gitignore globs (test: `walk.test.ts`) |
-| AC1.2 | PASS | returns files with path, content, `locate(index)→{line,col}` 1-based (test: `walk.test.ts`) |
-| AC1.3 | PASS | Finding type has `{ruleId, severity, file, line, col, message, snippet, remediation}` (src/types.ts) |
-| AC1.4 | PASS | binary (NUL byte) and huge (>1.5MB) files skipped; missing dir → VibecheckError (test: `walk.test.ts`) |
-| AC2.1 | PASS | Detects ≥7 token formats: AWS, GitHub, OpenAI, Stripe, Google, Slack, PEM (test: `secrets.test.ts`) |
-| AC2.2 | PASS | High-entropy secret-named assignment fires; placeholders/env refs/low-entropy do NOT (test: `secrets.test.ts`) |
-| AC2.3 | PASS | Committed `.env` (not gitignored) flagged (test: `secrets.test.ts`) |
-| AC2.4 | PASS | `.env` ↔ `.env.example` drift detected both directions (test: `secrets.test.ts`) |
-| AC2.5 | PASS | Safe fixtures produce zero findings (test: `secrets.test.ts` "safe values do NOT fire") |
-| AC3.1 | PASS | eval/new Function/child_process non-literal → finding; literal → none (test: `codescan.test.ts`) |
-| AC3.2 | PASS | SQL template interpolation/concat → high; parameterized → none (test: `codescan.test.ts`) |
-| AC3.3 | PASS | CORS `*` → finding; with credentials → high; locked-down → none (test: `codescan.test.ts`) |
-| AC3.4 | PASS | JWT none → critical; unpinned → high; pinned → none (test: `codescan.test.ts`) |
-| AC3.5 | PASS | Cookie without httpOnly+secure → high; hardened → none (test: `codescan.test.ts`) |
-| AC4.1 | PASS | Express/Next handlers without auth → review; with auth → none (test: `routes.test.ts`) |
-| AC4.2 | PASS | req.body read without validator → medium; with zod import → none (test: `routes.test.ts`) |
-| AC4.3 | PASS | NEXT_PUBLIC_*SECRET → high; ANON_KEY → none (test: `routes.test.ts`) |
-| AC4.4 | PASS | service_role in client → critical; in server → high (test: `routes.test.ts`) |
-| AC4.5 | PASS | `res.send(err.stack)` → medium (test: `routes.test.ts`) |
-| AC5.1 | PASS | `.vibecheck.json` ignoreRules suppresses findings (test: `e2e.test.ts`) |
-| AC5.2 | PASS | `scan` prints findings grouped by severity; `--json` emits stable schema (test + CLI run) |
-| AC5.3 | PASS | `--ci` exits 1 on vuln (≥high), exits 0 on clean (test + CLI run) |
-| AC5.4 | PASS | `explain VC-RCE-EVAL` → exit 0 with description; `explain NOPE` → exit 2 (test + CLI run) |
-| AC5.5 | PASS | Vulnerable fixture trips expected rules (critical>0); clean fixture yields zero ≥medium (test + CLI run) |
-| AC6.1 | PASS | MCP stdio server answers initialize/tools/list/tools/call with valid JSON-RPC (test + independent exercise) |
-| AC6.2 | PASS | Ships `AGENTS.md` (instructs agents to run `vibecheck . --ci`) and `llms.txt` |
-| AC6.3 | PASS | README rule table lists exactly 24 implemented rules; 2 ADRs present |
-| AC6.4 | PASS | Zero deps; tsc strict clean; bun test green; CI workflow present |
+Per-rule breakdown:
+| rule                    | TP | FP | FN |
+|-------------------------|----|----|----|
+| VC-COOKIE-INSECURE      | 1  | 0  | 0  |
+| VC-CORS-WILDCARD        | 2  | 0  | 0  |
+| VC-JWT-NONE             | 1  | 0  | 0  |
+| VC-JWT-UNPINNED         | 1  | 0  | 0  |
+| VC-NEXT-PUBLIC-SECRET   | 1  | 0  | 0  |
+| VC-OPEN-REDIRECT        | 1  | 0  | 0  |
+| VC-PATH-TRAVERSAL       | 1  | 0  | 0  |
+| VC-RCE-CHILD-PROCESS    | 2  | 0  | 0  |
+| VC-RCE-EVAL             | 3  | 0  | 0  |
+| VC-SQLI                 | 5  | 0  | 0  |
+| VC-SSRF                 | 2  | 0  | 0  |
+| VC-STACK-EXPOSURE       | 1  | 0  | 0  |
+| VC-SUPABASE-SERVICE-ROLE| 1  | 0  | 0  |
+| VC-XSS-DOM              | 3  | 0  | 0  |
+| VC-XSS-REACT            | 1  | 0  | 0  |
 
----
+All cases match their labels.
+```
 
-## Rule Coverage Table
+### Dependencies
+```
+[ '@babel/parser', '@babel/traverse', '@babel/types' ]
+```
+Confirmed: real @babel/* dependencies (by design for AST-based analysis).
 
-| Rule ID | Detector File | Vulnerable-Fires Test | Safe-Quiet Test |
-|---------|---------------|----------------------|-----------------|
-| VC-SECRET-PRIVATE-KEY | src/secrets.ts | ✅ secrets.test.ts (PEM key fires) | ✅ (safe fixtures produce 0) |
-| VC-SECRET-AWS-KEY | src/secrets.ts | ✅ secrets.test.ts (AKIA fires) | ✅ |
-| VC-SECRET-GITHUB | src/secrets.ts | ✅ secrets.test.ts (ghp_ fires) | ✅ |
-| VC-SECRET-OPENAI | src/secrets.ts | ✅ secrets.test.ts (sk- fires) | ✅ |
-| VC-SECRET-STRIPE | src/secrets.ts | ✅ e2e.test.ts (vuln fixture) | ✅ (clean fixture) |
-| VC-SECRET-GOOGLE | src/secrets.ts | ✅ (regex proven by pattern; AIza format) | ✅ (safe fixtures) |
-| VC-SECRET-SLACK | src/secrets.ts | ✅ secrets.test.ts (xoxb fires) | ✅ |
-| VC-SECRET-HIGH-ENTROPY | src/secrets.ts | ✅ secrets.test.ts (high-entropy fires) | ✅ (placeholders/env refs quiet) |
-| VC-ENV-COMMITTED | src/envcheck.ts | ✅ secrets.test.ts (.env fires) | ✅ (.env.example alone quiet) |
-| VC-ENV-DRIFT | src/envcheck.ts | ✅ secrets.test.ts (drift detected) | ✅ |
-| VC-ENV-MISSING | src/envcheck.ts | ✅ secrets.test.ts (missing detected) | ✅ |
-| VC-RCE-EVAL | src/codescan.ts | ✅ codescan.test.ts (eval(userInput) fires) | ✅ (eval("2+2") quiet) |
-| VC-RCE-CHILD-PROCESS | src/codescan.ts | ✅ codescan.test.ts + qa-fixes.test.ts | ✅ (literal quiet; ORM .exec() quiet) |
-| VC-SQLI-TEMPLATE | src/codescan.ts | ✅ codescan.test.ts (interpolated SQL fires) | ✅ (parameterized quiet) |
-| VC-SQLI-CONCAT | src/codescan.ts | ✅ codescan.test.ts (concat SQL fires) | ✅ (parameterized quiet) |
-| VC-CORS-WILDCARD | src/codescan.ts | ✅ codescan.test.ts (origin:"*" fires) | ✅ (explicit origin quiet) |
-| VC-JWT-NONE | src/codescan.ts | ✅ codescan.test.ts (algorithms:["none"] fires) | ✅ (pinned quiet) |
-| VC-JWT-UNPINNED | src/codescan.ts | ✅ codescan.test.ts (no algorithms fires) | ✅ (with algorithms quiet) |
-| VC-COOKIE-INSECURE | src/codescan.ts | ✅ codescan.test.ts (missing secure fires) | ✅ (httpOnly+secure quiet) |
-| VC-ROUTE-NO-AUTH | src/routes.ts | ✅ routes.test.ts (unauthed handler fires) | ✅ (requireAuth quiet) |
-| VC-INPUT-NO-VALIDATION | src/routes.ts | ✅ routes.test.ts (no validator fires) | ✅ (zod import quiet) |
-| VC-NEXT-PUBLIC-SECRET | src/routes.ts | ✅ routes.test.ts (NEXT_PUBLIC_API_SECRET fires) | ✅ (ANON_KEY quiet) |
-| VC-SUPABASE-SERVICE-ROLE | src/routes.ts | ✅ routes.test.ts + qa-fixes.test.ts | ✅ (comment mention quiet) |
-| VC-STACK-EXPOSURE | src/routes.ts | ✅ routes.test.ts (res.send(err.stack) fires) | ✅ (clean fixture quiet) |
+### License
+- `package.json` → `"license": "MIT"`
+- `LICENSE` file → standard MIT text, © 2026 Aris Rhiannon ✓
 
 ---
 
-## Cross-Check: Rule ID Consistency
+## Claims Verification
 
-- **Catalog (src/catalog.ts)**: 24 rules
-- **README rule table**: 24 rules
-- **Detector source (src/secrets.ts + src/envcheck.ts + src/codescan.ts + src/routes.ts)**: 24 rules
-- **Result**: All three sets are **identical**. No advertised-but-unimplemented or implemented-but-undocumented rules.
-
----
-
-## Honesty Mandate Verification
-
-Every rule advertised in README.md and src/catalog.ts is:
-1. **Genuinely implemented** in a detector file (not a stub — real regex/structural matching with logic)
-2. **Proven by a test that fires on vulnerable input** (confirmed via `bun test` — 29 passing tests)
-3. **Proven by a test that stays quiet on safe input** (each test file includes safe-fixture assertions)
-
-No stubs, no claimed-but-unbuilt features, no glorified JSON.
+| # | Claim | PASS/FAIL | Evidence |
+|---|-------|-----------|----------|
+| 1 | **Real AST**: src/ast.ts uses @babel/parser; TSX+decorators+dynamic-import+tagged-template+JSX parses successfully | **PASS** | `src/ast.ts` imports `parse` from `@babel/parser`, uses `decorators-legacy` plugin. `test/ast.test.ts` passes: parses TSX snippet with all four constructs, traverses to find `dangerouslySetInnerHTML` JSXAttribute. Test suite confirms (6ms). |
+| 2 | **Taint is real**: `knex.raw(q)` with tainted `q` → VC-SQLI high; `Number(req.query.id)` sanitized → no high/medium SQLI; parameterized `$1` → no SQLI | **PASS** | CLI `--json` on temp dirs: (a) `const q = req.query.q; knex.raw(q)` → `VC-SQLI` severity=critical confidence=high. (b) `const id = Number(req.query.id); db.query(...)` → only `VC-SQLI` at confidence=review (not high/medium). (c) `db.query('SELECT * FROM u WHERE id = $1',[x])` → zero findings. |
+| 3 | **Confidence gating**: `--ci` exits 0 on review-only; exits 1 on high-confidence taint. MCP returns high-confidence only by default. | **PASS** | (a) Route-only file (`app.get('/admin',...)`) → `--ci` exit 0 (only VC-ROUTE-NO-AUTH at review confidence). (b) Tainted SQLI file → `--ci` exit 1. (c) `src/mcp.ts` line: `r.findings.filter((f) => f.confidence === "high")` when `includeAll` is not set. |
+| 4 | **Benchmark integrity**: corpus contains genuine safe negatives; run.ts computes TP/FP/FN correctly | **PASS** | `benchmark/corpus.ts` contains 47 cases including tricky-safe: parameterized SQL (`$1`), tagged template (`sql\`...\``), numeric sanitization (`Number()`), schema validation (`.parse()`), ORM `.exec()`, RegExp `.exec()`, anon/publishable keys (`NEXT_PUBLIC_SUPABASE_ANON_KEY`), hardened cookies (`secure:true, sameSite:'lax'`), allowlisted CORS, pinned JWT. `run.ts` correctly: iterates corpus, computes emitted rule IDs per case, counts TP (expected∩emitted), FP (emitted−expected), FN (expected−emitted), derives precision/recall/F1. |
+| 5 | **Honesty**: README says NOT a Semgrep/CodeQL replacement; states JS/TS-only + intra-procedural limits; benchmark described as curated | **PASS** | README § "What it is — and what it is not": "vibecheck is **not** a replacement for Semgrep or CodeQL". Limitations section: "JS/TS/JSX/TSX only in v0.2", "Intra-procedural taint: flow across functions/files/modules is not tracked". Benchmark section: "This benchmark is curated (not 'scanned N real repos')". No "beats industry standard" claim found. |
 
 ---
 
-## Gaps
+## Rule List (implemented & benchmarked)
 
-None identified.
+**Taint-backed (high confidence when source→sink proven):**
+- VC-RCE-EVAL
+- VC-RCE-CHILD-PROCESS
+- VC-SQLI
+- VC-XSS-REACT
+- VC-XSS-DOM
+- VC-SSRF
+- VC-PATH-TRAVERSAL
+- VC-OPEN-REDIRECT
+
+**AST config analysis:**
+- VC-CORS-WILDCARD
+- VC-JWT-NONE
+- VC-JWT-UNPINNED
+- VC-COOKIE-INSECURE
+- VC-STACK-EXPOSURE
+
+**Provenance / secrets:**
+- VC-SECRET-* (8 patterns)
+- VC-ENV-COMMITTED / VC-ENV-DRIFT / VC-ENV-MISSING
+- VC-NEXT-PUBLIC-SECRET
+- VC-SUPABASE-SERVICE-ROLE
+
+**Advisory (review confidence, excluded from --ci by default):**
+- VC-ROUTE-NO-AUTH
+- VC-INPUT-NO-VALIDATION
 
 ---
 
-## Verdict
+## Limitations Acknowledged
 
-**VALIDATION: PASS**
+1. JS/TS/JSX/TSX only (v0.2)
+2. Intra-procedural taint only — no cross-function/file/module tracking
+3. Secret/config rules are pattern-based where AST adds no value
+4. Benchmark is curated (47 cases), not a real-world corpus scan
+5. Not a proof of security — complement with Semgrep/CodeQL
+
+---
+
+## Over-claims Assessment
+
+**None identified.** The README is appropriately modest:
+- Explicitly disclaims being a replacement for deeper tools
+- States the benchmark is curated, not "scanned N real repos"
+- Acknowledges intra-procedural limitation (false negatives for cross-function flows)
+- No "beats industry standard" language
+
+**Minor note:** The README states "43 cases" but the benchmark now reports **47 cases** — this is a stale number in the README (the corpus grew). Not an over-claim, just a documentation lag.
+
+---
+
+## VALIDATION: PASS
