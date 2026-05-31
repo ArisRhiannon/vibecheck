@@ -10,6 +10,8 @@ import (
 	"go/token"
 	"io"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -234,6 +236,36 @@ func computeSet(assigns []rec, seed map[string]bool, pkg string) map[string]bool
 	return s
 }
 
+var fixedHostRe = regexp.MustCompile(`^https?://[^/]+/`)
+
+// leadingStr returns the leftmost string-literal prefix of a `+` concat / literal, else "".
+func leadingStr(e ast.Expr) string {
+	switch v := e.(type) {
+	case *ast.BasicLit:
+		if v.Kind == token.STRING {
+			if s, err := strconv.Unquote(v.Value); err == nil {
+				return s
+			}
+		}
+	case *ast.BinaryExpr:
+		if v.Op == token.ADD {
+			return leadingStr(v.X)
+		}
+	case *ast.ParenExpr:
+		return leadingStr(v.X)
+	}
+	return ""
+}
+
+// redirectSafe: a fixed "/x…" relative path or a fixed "scheme://host/" prefix stays same-site.
+func redirectSafe(e ast.Expr) bool {
+	p := leadingStr(e)
+	if len(p) >= 2 && p[0] == '/' && p[1] != '/' {
+		return true
+	}
+	return fixedHostRe.MatchString(p)
+}
+
 func sinkHits(c *ast.CallExpr, T func(ast.Expr) bool) []Hit {
 	var hits []Hit
 	s := exprStr(c.Fun)
@@ -263,7 +295,7 @@ func sinkHits(c *ast.CallExpr, T func(ast.Expr) bool) []Hit {
 	if (s == "os.Open" || s == "os.ReadFile" || s == "ioutil.ReadFile" || s == "os.OpenFile") && len(c.Args) > 0 && T(c.Args[0]) {
 		hits = append(hits, Hit{"VC-GO-PATH", "high", "file path built from tainted input (path traversal)", "Resolve against a fixed base dir and reject '..'."})
 	}
-	if s == "http.Redirect" && len(c.Args) >= 3 && T(c.Args[2]) {
+	if s == "http.Redirect" && len(c.Args) >= 3 && T(c.Args[2]) && !redirectSafe(c.Args[2]) {
 		hits = append(hits, Hit{"VC-GO-OPEN-REDIRECT", "medium", "redirect target is tainted (open redirect)", "Redirect only to an allowlist of paths/hosts."})
 	}
 	if (s == "http.Get" || s == "http.Post" || s == "http.Head" || s == "http.NewRequest") && anyT() {

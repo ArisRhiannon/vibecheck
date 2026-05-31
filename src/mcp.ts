@@ -40,9 +40,11 @@ function handle(req: RpcReq): void {
 /** Start the MCP stdio server (newline-delimited JSON-RPC). */
 export function startMcp(): void {
   let buf = "";
+  const MAX_LINE = 16 * 1024 * 1024; // drop a pathological newline-less flood instead of growing unbounded
   process.stdin.setEncoding("utf8");
   process.stdin.on("data", (chunk: string) => {
     buf += chunk;
+    if (buf.length > MAX_LINE && !buf.includes("\n")) { buf = ""; return; }
     let nl: number;
     while ((nl = buf.indexOf("\n")) >= 0) {
       const line = buf.slice(0, nl).trim();

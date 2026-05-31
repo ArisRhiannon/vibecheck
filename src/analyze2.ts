@@ -56,6 +56,33 @@ function hasServerContributor(node: t.Node, set: Set<string>): boolean {
   return ok;
 }
 
+/** Per-scope set of variables whose taint comes from a SERVER source (not a client-side DOM `location`).
+ *  Used to gate SSRF so `const h = document.location.host; fetch(...h...)` is not flagged. */
+function serverTaintSets(file: t.File): Map<t.Node, Set<string>> {
+  const byScope = new Map<t.Node, Array<{ name: string; expr: t.Node }>>();
+  const add = (scope: t.Node, name: string, expr: t.Node | null | undefined) => {
+    if (!expr) return;
+    const a = byScope.get(scope) ?? [];
+    a.push({ name, expr });
+    byScope.set(scope, a);
+  };
+  traverse(file, {
+    VariableDeclarator(path) { if (t.isIdentifier(path.node.id)) add(path.getFunctionParent()?.node ?? file.program, path.node.id.name, path.node.init); },
+    AssignmentExpression(path) { if (path.node.operator === "=" && t.isIdentifier(path.node.left)) add(path.getFunctionParent()?.node ?? file.program, path.node.left.name, path.node.right); },
+  });
+  const out = new Map<t.Node, Set<string>>();
+  for (const [scope, recs] of byScope) {
+    const sv = new Set<string>();
+    for (let i = 0; i < 6; i++) {
+      let changed = false;
+      for (const { name, expr } of recs) if (hasServerContributor(expr, sv) && !sv.has(name)) { sv.add(name); changed = true; }
+      if (!changed) break;
+    }
+    out.set(scope, sv);
+  }
+  return out;
+}
+
 /** Find an object-expression argument and return a property's value node by key, if present. */
 function prop(obj: t.Node | undefined, key: string): t.Node | undefined {
   if (!obj || !t.isObjectExpression(obj)) return undefined;
@@ -76,6 +103,7 @@ export function astFindings(files: SourceFile[], summariesByRel?: Map<string, Su
     const ast = parseFile(f.content, f.rel);
     if (!ast) continue;
     const sets = buildTaintSets(ast, summariesByRel?.get(f.rel) ?? buildSummaries(ast));
+    const serverSets = serverTaintSets(ast);
     const lines = f.content.split("\n");
     const hasValidator = VALIDATOR_IMPORT.test(f.content);
     const isNextRoute = /(?:^|\/)route\.(?:t|j)sx?$/.test(f.rel);
@@ -92,7 +120,7 @@ export function astFindings(files: SourceFile[], summariesByRel?: Map<string, Su
         const arg0 = node.arguments[0] as t.Node | undefined;
         const cp = memberPath(callee as t.Node);
         const tainted = (n: t.Node | undefined) => !!n && taintedAt(path, n, ast, sets);
-        const scopeSet = sets.get(path.getFunctionParent()?.node ?? ast.program) ?? new Set<string>();
+        const scopeSet = serverSets.get(path.getFunctionParent()?.node ?? ast.program) ?? new Set<string>();
 
         // eval(x)
         if (t.isIdentifier(callee) && callee.name === "eval" && arg0 && !literalish(arg0)) {
