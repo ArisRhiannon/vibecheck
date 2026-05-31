@@ -48,8 +48,9 @@ tricky-safe), the core detectors score (see [`METRICS.md`](METRICS.md), reproduc
 The tricky-safe cases that produce **zero false positives** include: parameterized queries, tagged-
 template SQL, numeric-coerced and schema-validated input, ORM/RegExp `.exec()`, Supabase **anon** /
 Stripe **publishable** keys, hardened cookies, allow-listed CORS, and pinned JWT algorithms — exactly
-the patterns a regex linter trips on. This benchmark is curated (not "scanned N real repos"); a
-real-world corpus is on the roadmap.
+the patterns a regex linter trips on. This benchmark is curated; for a **real-world** measurement (pinned
+OSS repos, manually triaged), see [`docs/CORPUS.md`](docs/CORPUS.md) — which also drove a precision fix
+(fixed-prefix relative redirects are no longer flagged).
 
 ## Confidence (the anti-false-positive-loop design)
 
