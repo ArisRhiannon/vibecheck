@@ -233,16 +233,18 @@ function importedNames(file: t.File): Set<string> {
 export function crossFileSummaries(files: SourceFile[]): Map<string, Summaries> {
   const parsed = new Map<string, t.File>();
   const local = new Map<string, Summaries>();
-  const global: Summaries = new Map();
   for (const f of files) {
     if (!JS_SUM.test(f.rel)) continue;
     const ast = parseFile(f.content, f.rel);
     if (!ast) continue;
     parsed.set(f.rel, ast);
-    const s = buildSummaries(ast);
-    local.set(f.rel, s);
-    for (const [n, sm] of s) if (!global.has(n)) global.set(n, sm);
+    local.set(f.rel, buildSummaries(ast));
   }
+  // A name defined in >1 file is ambiguous (no real module resolution) → never resolve it cross-file.
+  const defCount = new Map<string, number>();
+  for (const s of local.values()) for (const n of s.keys()) defCount.set(n, (defCount.get(n) ?? 0) + 1);
+  const global: Summaries = new Map();
+  for (const s of local.values()) for (const [n, sm] of s) if ((defCount.get(n) ?? 0) === 1) global.set(n, sm);
   const out = new Map<string, Summaries>();
   for (const [rel, ast] of parsed) {
     const base: Summaries = new Map(local.get(rel));

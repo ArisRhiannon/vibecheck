@@ -19,4 +19,9 @@ describe("cross-file (by imported name) taint", () => {
     const f = interprocFindings(files, crossFileSummaries(files));
     expect(f.some((x) => x.ruleId === "VC-SQLI")).toBe(false);
   });
+  test("a name defined in more than one file is ambiguous and not resolved cross-file (QA FP1)", () => {
+    const files = [sf("a.ts", "export function getData(){ return req.body.x; }"), sf("safe.ts", "export function getData(){ return 42; }"), sf("app.ts", "import { getData } from './safe';\nconst v = getData();\ndb.query(v);")];
+    const f = astFindings(files, crossFileSummaries(files));
+    expect(f.some((x) => x.ruleId === "VC-SQLI")).toBe(false);
+  });
 });

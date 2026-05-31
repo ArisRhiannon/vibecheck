@@ -63,7 +63,7 @@ type ParamSink = { param: number; hit: Sink };
  *  into a helper whose parameter provably reaches a dangerous sink (sanitizers respected). Taint-backed → high. */
 export function interprocFindings(files: SourceFile[], summariesByRel?: Map<string, Summaries>): Finding[] {
   const out: Finding[] = [];
-  const infos: Array<{ f: SourceFile; ast: t.File; summary: Map<string, ParamSink[]>; imports: Set<string> }> = [];
+  const infos: Array<{ f: SourceFile; ast: t.File; summary: Map<string, ParamSink[]>; imports: Set<string>; defined: Set<string> }> = [];
   const global = new Map<string, ParamSink[]>();
 
   for (const f of files) {
@@ -93,9 +93,12 @@ export function interprocFindings(files: SourceFile[], summariesByRel?: Map<stri
       fn.params.forEach((pn, i) => { if (!pn) return; const set = fixpoint(assigns, new Set([pn])); for (const hit of sinks) if (isTainted(hit.arg, set)) ps.push({ param: i, hit }); });
       if (ps.length) summary.set(name, ps);
     }
-    infos.push({ f, ast, summary, imports: importedNames(ast) });
-    for (const [n, ps] of summary) if (!global.has(n)) global.set(n, ps);
+    infos.push({ f, ast, summary, imports: importedNames(ast), defined: new Set(fns.keys()) });
   }
+  // A helper name defined in >1 file is ambiguous (no module resolution) → never resolve it cross-file.
+  const defCount = new Map<string, number>();
+  for (const info of infos) for (const n of info.defined) defCount.set(n, (defCount.get(n) ?? 0) + 1);
+  for (const info of infos) for (const [n, ps] of info.summary) if ((defCount.get(n) ?? 0) === 1 && !global.has(n)) global.set(n, ps);
 
   for (const { f, ast, summary, imports } of infos) {
     const effective = new Map(summary);
