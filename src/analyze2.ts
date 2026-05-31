@@ -1,6 +1,6 @@
 import { type SourceFile, type Finding, type Severity, type Confidence } from "./types";
 import { parseFile, traverse, t, type NodePath } from "./ast";
-import { buildTaintSets, taintedAt, isSourceExpr, memberPath } from "./taint";
+import { buildTaintSets, buildSummaries, taintedAt, isSourceExpr, memberPath, type Summaries } from "./taint";
 
 const JS = /\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
 const CP = new Set(["exec", "execSync", "execFile", "execFileSync", "spawn", "spawnSync"]);
@@ -25,13 +25,13 @@ function isTrue(node: t.Node | undefined): boolean {
 }
 
 /** AST + taint analysis of JS/TS/JSX/TSX files. Findings carry confidence (taint-backed = high). */
-export function astFindings(files: SourceFile[]): Finding[] {
+export function astFindings(files: SourceFile[], summariesByRel?: Map<string, Summaries>): Finding[] {
   const out: Finding[] = [];
   for (const f of files) {
     if (!JS.test(f.rel)) continue;
     const ast = parseFile(f.content, f.rel);
     if (!ast) continue;
-    const sets = buildTaintSets(ast);
+    const sets = buildTaintSets(ast, summariesByRel?.get(f.rel) ?? buildSummaries(ast));
     const lines = f.content.split("\n");
     const hasValidator = VALIDATOR_IMPORT.test(f.content);
     const isNextRoute = /(?:^|\/)route\.(?:t|j)sx?$/.test(f.rel);

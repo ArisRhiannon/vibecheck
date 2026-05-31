@@ -1,6 +1,6 @@
 import { type SourceFile, type Finding, type Severity } from "./types";
 import { parseFile, traverse, t } from "./ast";
-import { buildTaintSets, taintedAt, isTainted, isSourceExpr } from "./taint";
+import { buildTaintSets, buildSummaries, taintedAt, isTainted, isSourceExpr, type Summaries } from "./taint";
 
 const JS = /\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
 const CP = new Set(["exec", "execSync", "execFile", "execFileSync", "spawn", "spawnSync"]);
@@ -51,10 +51,21 @@ function fixpoint(assigns: Array<{ names: string[]; expr: t.Node | null | undefi
   return s;
 }
 
-/** Intra-file inter-procedural findings: a call passes attacker input into a helper whose parameter
- *  provably reaches a dangerous sink (respecting sanitizing reassignments). Taint-backed → high. */
-export function interprocFindings(files: SourceFile[]): Finding[] {
+function importedNames(file: t.File): Set<string> {
+  const names = new Set<string>();
+  traverse(file, { ImportDeclaration(path) { for (const sp of path.node.specifiers) names.add(sp.local.name); } });
+  return names;
+}
+
+type ParamSink = { param: number; hit: Sink };
+
+/** Intra-file AND cross-file (by imported name) inter-procedural findings: a call passes attacker input
+ *  into a helper whose parameter provably reaches a dangerous sink (sanitizers respected). Taint-backed → high. */
+export function interprocFindings(files: SourceFile[], summariesByRel?: Map<string, Summaries>): Finding[] {
   const out: Finding[] = [];
+  const infos: Array<{ f: SourceFile; ast: t.File; summary: Map<string, ParamSink[]>; imports: Set<string> }> = [];
+  const global = new Map<string, ParamSink[]>();
+
   for (const f of files) {
     if (!JS.test(f.rel)) continue;
     const ast = parseFile(f.content, f.rel);
@@ -63,7 +74,6 @@ export function interprocFindings(files: SourceFile[]): Finding[] {
     const assignsByFn = new Map<t.Node, Array<{ names: string[]; expr: t.Node | null | undefined }>>();
     const sinksByFn = new Map<t.Node, Sink[]>();
     const add = <V>(map: Map<t.Node, V[]>, k: t.Node, v: V) => map.set(k, [...(map.get(k) ?? []), v]);
-
     traverse(ast, {
       Function(path) {
         let name: string | null = null;
@@ -71,43 +81,33 @@ export function interprocFindings(files: SourceFile[]): Finding[] {
         else if (path.parentPath?.isVariableDeclarator() && t.isIdentifier(path.parentPath.node.id)) name = path.parentPath.node.id.name;
         if (name) fns.set(name, { node: path.node, params: path.node.params.map((p) => paramName(p as t.Node)) });
       },
-      VariableDeclarator(path) {
-        const fn = path.getFunctionParent()?.node;
-        if (fn && t.isIdentifier(path.node.id)) add(assignsByFn, fn, { names: [path.node.id.name], expr: path.node.init });
-      },
-      AssignmentExpression(path) {
-        const fn = path.getFunctionParent()?.node;
-        if (fn && path.node.operator === "=" && t.isIdentifier(path.node.left)) add(assignsByFn, fn, { names: [path.node.left.name], expr: path.node.right });
-      },
-      CallExpression(path) {
-        const fn = path.getFunctionParent()?.node;
-        const hit = matchSink(path.node);
-        if (fn && hit) add(sinksByFn, fn, hit);
-      },
+      VariableDeclarator(path) { const fn = path.getFunctionParent()?.node; if (fn && t.isIdentifier(path.node.id)) add(assignsByFn, fn, { names: [path.node.id.name], expr: path.node.init }); },
+      AssignmentExpression(path) { const fn = path.getFunctionParent()?.node; if (fn && path.node.operator === "=" && t.isIdentifier(path.node.left)) add(assignsByFn, fn, { names: [path.node.left.name], expr: path.node.right }); },
+      CallExpression(path) { const fn = path.getFunctionParent()?.node; const hit = matchSink(path.node); if (fn && hit) add(sinksByFn, fn, hit); },
     });
-
-    // Per-function summary: which parameter index provably reaches which sink.
-    const summary = new Map<string, Array<{ param: number; hit: Sink }>>();
+    const summary = new Map<string, ParamSink[]>();
     for (const [name, fn] of fns) {
       const sinks = sinksByFn.get(fn.node) ?? [];
       const assigns = assignsByFn.get(fn.node) ?? [];
-      const ps: Array<{ param: number; hit: Sink }> = [];
-      fn.params.forEach((pn, i) => {
-        if (!pn) return;
-        const set = fixpoint(assigns, new Set([pn]));
-        for (const hit of sinks) if (isTainted(hit.arg, set)) ps.push({ param: i, hit });
-      });
+      const ps: ParamSink[] = [];
+      fn.params.forEach((pn, i) => { if (!pn) return; const set = fixpoint(assigns, new Set([pn])); for (const hit of sinks) if (isTainted(hit.arg, set)) ps.push({ param: i, hit }); });
       if (ps.length) summary.set(name, ps);
     }
-    if (!summary.size) continue;
+    infos.push({ f, ast, summary, imports: importedNames(ast) });
+    for (const [n, ps] of summary) if (!global.has(n)) global.set(n, ps);
+  }
 
-    const sets = buildTaintSets(ast);
+  for (const { f, ast, summary, imports } of infos) {
+    const effective = new Map(summary);
+    for (const n of imports) { const g = global.get(n); if (g && !effective.has(n)) effective.set(n, g); }
+    if (!effective.size) continue;
+    const sets = buildTaintSets(ast, summariesByRel?.get(f.rel) ?? buildSummaries(ast));
     const lines = f.content.split("\n");
     traverse(ast, {
       CallExpression(path) {
         const callee = path.node.callee;
         if (!t.isIdentifier(callee)) return;
-        const ps = summary.get(callee.name);
+        const ps = effective.get(callee.name);
         if (!ps) return;
         for (const { param, hit } of ps) {
           const arg = path.node.arguments[param] as t.Node | undefined;
