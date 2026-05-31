@@ -74,8 +74,9 @@ Agents: see [`AGENTS.md`](AGENTS.md) — run `vibecheck . --ci` before declaring
 high-confidence finding.
 
 > JS/TS scanning needs nothing extra. **Python** scanning requires **`python3` on PATH**; **Go** scanning
-> requires a **`go` toolchain on PATH** (the analyzer is compiled once and cached). If a runtime is absent,
-> those files are silently skipped.
+> requires a **`go` toolchain on PATH** (the analyzer is compiled once and cached). If a runtime is absent
+> those files are skipped; if an analyzer **fails**, a warning is printed to **stderr** (so a crash never
+> silently drops findings).
 
 ## Rules (exactly what is implemented + benchmarked)
 

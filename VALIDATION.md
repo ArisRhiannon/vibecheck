@@ -278,3 +278,8 @@ The last known high-confidence false positive from the v0.12 audit — a local v
 - **Verified:** `const req = {body:{}}; db.query("…"+req.body.name)` → at most `review` (out of the gate), not `high`; a real `req` **parameter** still fires `high`; `let req; req = {…}` also guarded.
 - **Zero regression:** 96-case benchmark 100/100/0FP; 61 tests; corpus unchanged (7 high-confidence, dvpwa still a true positive, 0 new FPs). `isTainted`/`taintedAt`/`buildTaintSets` signatures unchanged.
 - Residual: the same name-collision is theoretically possible in the Python/Go analyzers (rarer) and is not yet scope-guarded — documented.
+
+
+## v0.15 — Subprocess failures surface to stderr (no silent false negatives)
+
+Reliability fix (audit P3): the Python/Go subprocess bridges previously returned `[]` on any failure, so a crashed/garbled analyzer (or a Go compile error) silently scanned **nothing** — an invisible false negative at scale. Now `pythonFindings`/`goFindings` (and the Go build step) write a one-line **stderr** warning naming the language and the count of files not scanned, on: non-zero exit, empty/invalid output, or compile failure. stdout (the JSON-RPC/`--json` channel) is untouched, so MCP and machine output are unaffected; a missing runtime is still a clean documented skip. Verified: a normal scan emits no spurious warnings; 61 tests + 96-case benchmark green.

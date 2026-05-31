@@ -19,9 +19,15 @@ export function pythonFindings(files: SourceFile[]): Finding[] {
   if (py.length === 0 || !pythonAvailable()) return [];
   const input = JSON.stringify(py.map((f) => ({ path: f.rel, content: f.content })));
   const r = spawnSync("python3", [SCRIPT], { input, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
-  if (r.status !== 0 || !r.stdout) return [];
+  if (r.status !== 0 || !r.stdout) {
+    process.stderr.write(`vibecheck: Python analyzer failed — ${py.length} .py file(s) NOT scanned${r.stderr ? `: ${String(r.stderr).split("\n")[0]}` : ""}\n`);
+    return [];
+  }
   let raw: Array<Record<string, unknown>>;
-  try { raw = JSON.parse(r.stdout); } catch { return []; }
+  try { raw = JSON.parse(r.stdout); } catch {
+    process.stderr.write(`vibecheck: Python analyzer emitted invalid output — ${py.length} .py file(s) NOT scanned\n`);
+    return [];
+  }
   const byRel = new Map(py.map((f) => [f.rel, f]));
   return raw.map((x) => {
     const rel = String(x.file);

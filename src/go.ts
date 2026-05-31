@@ -26,7 +26,11 @@ function bin(): string | null {
   const out = join(tmpdir(), `vibecheck-go-${hash}`);
   if (!existsSync(out)) {
     const r = spawnSync(go, ["build", "-o", out, SRC], { encoding: "utf8", env: { ...process.env, GOCACHE } });
-    if (r.status !== 0 || !existsSync(out)) { resolved = null; return resolved; }
+    if (r.status !== 0 || !existsSync(out)) {
+      process.stderr.write(`vibecheck: Go analyzer failed to compile; .go files will be skipped${r.stderr ? `: ${String(r.stderr).split("\n")[0]}` : ""}\n`);
+      resolved = null;
+      return resolved;
+    }
   }
   resolved = out;
   return resolved;
@@ -43,9 +47,15 @@ export function goFindings(files: SourceFile[]): Finding[] {
   if (!exe) return [];
   const input = JSON.stringify(go.map((f) => ({ path: f.rel, content: f.content })));
   const r = spawnSync(exe, [], { input, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
-  if (r.status !== 0 || !r.stdout) return [];
+  if (r.status !== 0 || !r.stdout) {
+    process.stderr.write(`vibecheck: Go analyzer failed — ${go.length} .go file(s) NOT scanned${r.stderr ? `: ${String(r.stderr).split("\n")[0]}` : ""}\n`);
+    return [];
+  }
   let raw: Array<Record<string, unknown>>;
-  try { raw = JSON.parse(r.stdout); } catch { return []; }
+  try { raw = JSON.parse(r.stdout); } catch {
+    process.stderr.write(`vibecheck: Go analyzer emitted invalid output — ${go.length} .go file(s) NOT scanned\n`);
+    return [];
+  }
   const byRel = new Map(go.map((f) => [f.rel, f]));
   return raw.map((x) => {
     const rel = String(x.File);
