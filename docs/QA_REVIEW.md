@@ -1,169 +1,108 @@
 # Code Review Report
 
-**Target:** vibecheck — offline TypeScript security scanner (full codebase)  
-**Strategy:** medium  
-**Dimensions:** Detection correctness, False positives, ReDoS/Termination, MCP correctness, CLI/exit codes, Honesty  
-**Confidence threshold:** 75  
-**Generated:** 2026-05-31T03:00:00Z  
+**Target:** vibecheck v0.2 re-architecture (src/, benchmark/, test/, docs/)
+**Strategy:** medium
+**Dimensions:** Security, Correctness, Testing, Reliability, Honesty
+**Confidence threshold:** 75
+**Generated:** 2026-05-31T03:50:35Z
 
 ## Executive summary
 
-The tool is **well-built, honest, and functional**. All 24 advertised rules have real detector implementations that fire on realistic vulnerable code and stay quiet on safe code. The README's threat model section accurately describes the heuristic limitations. No ReDoS vulnerabilities found. MCP and CLI work correctly. The main actionable issue is false positives from `exec()` matching ORM/regex method calls (DET3), and `service_role` matching comments (DET5).
+The v0.2 re-architecture is **genuinely better than v0.1** — it uses a real AST parser, implements actual intra-procedural taint tracking, and the confidence-gating design is sound. However, the taint engine has two concrete soundness gaps (JSON.parse taint loss, monotonic set can't un-taint) and the SQLI rule over-fires on non-SQL `.query()` calls. The 100/100 benchmark is honest but self-serving — adding 3 adversarial cases would break it and drive real improvements.
 
-## Verdict: **PASS** (with minor issues to track)
+## Verdict: **NEEDS-FIX**
 
-No critical or high-severity findings in the tool itself. The issues found are medium/low false-positive risks that don't undermine the tool's core value proposition.
-
----
+The tool is a genuine improvement and the honest framing is commendable, but the taint bypass through `JSON.parse()` (the most common Express body-reading pattern) is a significant false-negative gap, and the `.query()` over-firing is a real false-positive risk that undermines the "low-FP" promise.
 
 ## Findings
 
-### Medium (P2) — plan for next sprint (2)
+### Critical (P0) — must fix immediately (0)
 
-#### [DET3] `exec(` regex matches ORM `.exec()` and `RegExp.exec()` — false positives
+None.
 
-- **Severity:** Medium
-- **Confidence:** 92
-- **Location:** `src/codescan.ts:36`
-- **Evidence:**
-  ```typescript
-  /\b(?:exec|execSync|execFile|execFileSync|spawn|spawnSync)\s*\(/g
-  ```
-  Fires on `User.find().exec()`, `/pattern/.exec(str)`, `knex(...).exec()` because `\b` matches
-  after `.` (non-word char). `firstArgIsLiteral` returns false for these (arg is not a plain string
-  literal), so the finding is emitted.
-- **Failing input:** `const users = await User.find({ active: true }).exec();`
-- **Fix:** Add negative lookbehind for `.`: use `/(?<!\.\s*)(?:exec|execSync|...)\s*\(/g` or check
-  that the character before the match is not `.`. Alternatively, require `exec`/`spawn` to be
-  preceded by `require("child_process")` or imported from `child_process` in the file.
+### High (P1) — fix before next release (0)
 
-#### [DET5] `service_role` fires on comments and documentation
+None.
 
-- **Severity:** Medium
-- **Confidence:** 88
-- **Location:** `src/routes.ts:58-62`
-- **Evidence:**
-  ```typescript
-  const idx = c.search(/service_role/i);
-  ```
-  Fires on `// Never expose the service_role key to clients` — a comment warning AGAINST the
-  practice triggers a high-severity finding.
-- **Failing input:** `// WARNING: do not use service_role key here`
-- **Fix:** Check that the match is not on a comment-only line. Simple heuristic: skip if the line
-  containing the match starts with `//` or `*` (inside block comment). Or require `service_role`
-  to appear in a string literal or assignment context.
+### Medium (P2) — plan for next sprint (4)
 
----
+#### [TAINT1] `JSON.parse(taintedSource)` loses taint — false negative on the #1 body-reading pattern
+- **File:** `src/taint.ts:50-55`
+- **Impact:** The most common Express pattern (`JSON.parse(req.body)`) produces data the tool considers clean. Any sink consuming the parsed result is a false negative.
+- **Fix:** In the MemberExpression-callee branch of CallExpression, also propagate taint if any argument is tainted (excluding sanitizers).
 
-### Low (P3) — track in backlog (4)
+#### [TAINT3] Monotonic taint set produces false positives on sanitize-then-use via reassignment
+- **File:** `src/taint.ts:86-98`
+- **Impact:** `let id = req.query.id; id = Number(id); sink(id)` fires as tainted even though `id` was sanitized. Undermines the "low-FP" promise.
+- **Fix:** Consider flow-sensitive ordering, or remove a variable from the set if its last assignment is a sanitizer.
 
-#### [DET1] Shannon entropy threshold (3.5) differs from PLAN.md (~4.0)
+#### [ANAL1] `.query()` / `.execute()` fires VC-SQLI on non-SQL objects (Redis, HTTP, etc.)
+- **File:** `src/analyze2.ts:62-70`
+- **Impact:** Any tainted argument to ANY object's `.query()` or `.execute()` method fires a critical/high SQLI finding. Redis, Elasticsearch, and HTTP client usage will produce false positives.
+- **Fix:** Constrain the object name to SQL-associated identifiers, or downgrade generic `.query()`/`.execute()` to medium confidence.
 
-- **Severity:** Low
-- **Confidence:** 85
-- **Location:** `src/secrets.ts:30` vs `docs/PLAN.md` AC2.2
-- **Fix:** Update PLAN.md to reflect the actual implementation values (3.5 bits, 12+ chars).
+#### [BENCH1] Benchmark corpus lacks adversarial cases — 100/100 is fragile
+- **File:** `benchmark/corpus.ts`
+- **Impact:** Three concrete cases would break the perfect score, revealing TAINT1, TAINT3, and ANAL1. The metric is honest but doesn't stress-test weaknesses.
+- **Fix:** Add the three cases documented in the finding. Accept the score drop until the underlying issues are fixed.
 
-#### [DET2] SQLI-CONCAT misses parenthesized expressions after `+`
+### Low (P3) — track in backlog (2)
 
-- **Severity:** Low
-- **Confidence:** 90
-- **Location:** `src/codescan.ts:52-54`
-- **Failing input:** `"SELECT * FROM users WHERE id=" + (req.params.id)`
-- **Fix:** Broaden trailing char class to `[A-Za-z_$(]`.
+#### [MCP1] MCP `counts` object is unfiltered while `findings` array is filtered
+- **File:** `src/mcp.ts:36-37`
+- **Impact:** Agents see inconsistent data (e.g., `counts.critical: 3` but only 1 finding in the array).
+- **Fix:** `const counts = countBySeverity(findings);` after filtering.
 
-#### [DET4] JWT-UNPINNED 250-char lookahead may miss algorithms in formatted code
-
-- **Severity:** Low
-- **Confidence:** 78
-- **Location:** `src/codescan.ts:68-69`
-- **Failing input:** `jwt.verify(token, secret, { issuer: "x", audience: "y", /* ...200+ chars... */ algorithms: ["RS256"] })`
-- **Fix:** Increase window to 500 or use `spanTo` to find the closing `)`.
-
-#### [DET8] Nested template literals can confuse `spanTo` scope detection
-
-- **Severity:** Low
-- **Confidence:** 76
-- **Location:** `src/routes.ts:17-27`
-- **Failing input:** `` app.get("/x", (req, res) => { const x = `${`inner`}`; res.json(x); }) ``
-- **Fix:** Document as known limitation. Nested templates in route handlers are extremely rare.
-
-#### [PERF1] `locate()` is O(n) per call — quadratic on files with many findings
-
-- **Severity:** Low
-- **Confidence:** 80
-- **Location:** `src/walk.ts:72-81`
-- **Fix:** Pre-compute line-start array, binary-search. Low priority given 1.5MB cap.
-
----
+#### [ANAL3] `document.writeln()` not detected as XSS sink
+- **File:** `src/analyze2.ts:79`
+- **Impact:** Minor coverage gap; `writeln` is rare but equally dangerous.
+- **Fix:** Add `|| cp === "document.writeln"` to the condition.
 
 ## Findings by dimension
 
-| Dimension              | Critical | High | Medium | Low | Total |
-|------------------------|----------|------|--------|-----|-------|
-| Detection correctness  | 0        | 0    | 1      | 3   | 4     |
-| False positives        | 0        | 0    | 1      | 0   | 1     |
-| ReDoS / Termination    | 0        | 0    | 0      | 1   | 1     |
-| MCP correctness        | 0        | 0    | 0      | 0   | 0     |
-| CLI / exit codes       | 0        | 0    | 0      | 0   | 0     |
-| Honesty                | 0        | 0    | 0      | 1   | 1     |
-| Performance            | 0        | 0    | 0      | 1   | 1     |
-| **Total**              | **0**    | **0**| **2**  | **5**| **7** |
-
----
-
-## Bypass analysis summary
-
-| Bypass technique | Caught? | Expected? |
-|-----------------|---------|-----------|
-| RCE via bracket notation (`global["eval"](x)`) | ❌ No | Yes — acknowledged limitation |
-| SQLi via multi-statement building (`q += x`) | ❌ No | Yes — acknowledged limitation |
-| Secret split across variables | ❌ No | Yes — acknowledged limitation |
-| Base64-encoded secret | ❌ No | Yes — acknowledged limitation |
-| SQLi via parenthesized expr (`"SQL" + (x)`) | ❌ No | Minor gap, fixable |
-| ORM `.exec()` false positive | ⚠️ FP | Fixable with lookbehind |
-
-All missed bypasses are within the tool's stated threat model ("heuristic, not a full taint engine").
-
----
+| Dimension     | Critical | High | Medium | Low | Total |
+|---------------|---------:|-----:|-------:|----:|------:|
+| Security      |        0 |    0 |      3 |   1 |     4 |
+| Testing       |        0 |    0 |      1 |   0 |     1 |
+| Reliability   |        0 |    0 |      0 |   1 |     1 |
+| **Total**     |    **0** |**0** |  **4** |**2**| **6** |
 
 ## Recommended action plan
 
-1. **[DET3]** Fix `.exec()` false positives — add negative lookbehind or context check for child_process import. This is the highest-impact improvement.
-2. **[DET5]** Skip `service_role` matches on comment-only lines to reduce false positives.
-3. **[DET2]** Broaden SQLI-CONCAT trailing pattern to include `(`.
-4. **[DET4]** Increase JWT lookahead window to 500 chars.
-5. **[DET1]** Update PLAN.md to match actual thresholds.
-
----
+1. **Fix TAINT1** (JSON.parse taint propagation) — highest impact, most common pattern missed.
+2. **Fix ANAL1** (constrain .query()/.execute() to SQL objects) — prevents the most likely real-world FPs.
+3. **Add adversarial benchmark cases** (BENCH1) — will validate fixes to #1 and #2, and expose TAINT3.
+4. **Fix TAINT3** (flow-sensitive sanitization) — harder; acceptable to document as known limitation if fix is complex.
+5. **Fix MCP1** (recompute counts) — one-line fix.
+6. **Fix ANAL3** (add writeln) — one-line fix.
 
 ## Praise
 
-- 🎉 **Honest threat model.** The README explicitly states limitations and doesn't over-claim. The "review" severity for route-auth findings is exactly right — it flags for human review without blocking CI.
-- 🎉 **Clean false-positive suppression.** The PLACEHOLDER regex, env-ref detection, and publishable-key exclusions show careful thought about what NOT to flag.
-- 🎉 **`spanTo` is well-designed.** It handles string escaping, multiple quote types, and always terminates. The scope-based auth checking (only within the handler's own call span) is a smart approach that reduces noise.
-- 🎉 **MCP implementation is correct and minimal.** Handles notifications properly, stays alive on stdin, flushes synchronously. The test actually spawns the process and validates JSON-RPC — real integration testing.
-- 🎉 **Zero dependencies achieved.** No runtime deps, only type-checking devDeps. The tool does what it claims.
-- 🎉 **`--ci` default threshold is "high"** — review/medium findings don't block, which is the right default for a heuristic tool.
-- 🎉 **Every regex is ReDoS-safe.** No catastrophic backtracking patterns found. Character-class negations (`[^"'\n]*`) are bounded by line/quote terminators.
-
----
+- 🎉 The confidence-gating architecture is well-designed. The separation of `high`/`medium`/`review` with `--ci` defaulting to high-only is exactly right for agent loops.
+- 🎉 The REARCHITECTURE.md is refreshingly honest — it concedes v0.1's weaknesses directly and doesn't over-claim v0.2's capabilities.
+- 🎉 The sanitizer recognition (Number/parseInt/schema.parse) is a thoughtful touch that most quick SAST implementations skip.
+- 🎉 The ORM `.exec()` exclusion is correctly implemented via the member-expression object-name check — no false positives on Mongoose/RegExp.
+- 🎉 The benchmark infrastructure (labeled corpus + precision/recall + CI regression test) is the right approach for a tool that claims measured quality.
+- 🎉 The `buildTaintSets` fixpoint with a hard iteration cap (4) is a pragmatic design that guarantees termination while handling realistic taint chains.
 
 ## Out of scope (not reviewed)
 
-- Runtime performance benchmarking (no execution environment for timing)
-- Actual CI pipeline behavior (`.github/workflows/ci.yml` not deeply reviewed)
-- License compliance (MIT)
-- Cross-platform path handling (Windows `\` separators — `walk.ts` normalizes to `/`)
+- Inter-procedural taint (explicitly out of scope for v0.2)
+- Performance benchmarking (tool runs in ms, no concern)
+- Multi-language support (explicitly roadmap)
+- `src/walk.ts` gitignore parsing correctness (tested by existing tests)
+- `src/envcheck.ts` logic (straightforward, well-tested)
 
 ## False positives eliminated
 
-- 5 candidate findings dropped during verification:
-  1. "MCP id:0 handling" — verified correct on re-read
-  2. "eval('') is safe" — by design, literal strings are not RCE
-  3. "SQLI regex backtracking" — bounded by `[^"'\n]*`, no nested quantifiers
-  4. "spanTo template literal issue" — backtick-quoted content correctly skipped in common cases
-  5. "NEXT_PUBLIC false positive on anon keys" — explicitly excluded by `/PUBLISHABLE|ANON|PUBLIC_KEY/`
+7 candidate findings eliminated after applying §0–§15 checks:
+- TAINT2: documented limitation, not a bug
+- ANAL2: common patterns covered, rare gap acceptable
+- ANAL4: regex is correctly bounded, advisory-only finding
+- REDOS1: no actual ReDoS after analysis
+- HONEST1: README is genuinely honest
+- GATE1: positive finding (works correctly)
+- TAINT4: positive finding (terminates correctly)
 
 ## Metadata
 

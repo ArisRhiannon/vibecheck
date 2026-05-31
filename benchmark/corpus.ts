@@ -52,4 +52,9 @@ export const CORPUS: Case[] = [
   { name: "nextpublic-secret", rel: "a.ts", code: "const k = process.env.NEXT_PUBLIC_API_SECRET;", expect: ["VC-NEXT-PUBLIC-SECRET"] },
   { name: "nextpublic-anon-safe", rel: "a.ts", code: "const k = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;", expect: [] },
   { name: "supabase-service-role", rel: "a.ts", code: "createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY);", expect: ["VC-SUPABASE-SERVICE-ROLE"] },
+  // adversarial (QA-driven)
+  { name: "sqli-json-parse-taint", rel: "a.ts", code: "const d = JSON.parse(req.body); prisma.$queryRawUnsafe(d.q);", expect: ["VC-SQLI"] },
+  { name: "sqli-sanitize-reassign-safe", rel: "a.ts", code: "let id = req.query.id; id = Number(id); db.query(`SELECT * FROM u WHERE id = ${id}`);", expect: [] },
+  { name: "non-sql-execute-safe", rel: "a.ts", code: "redisClient.execute(req.body.cmd);", expect: [] },
+  { name: "xss-docwriteln-taint", rel: "a.ts", code: "document.writeln(location.hash);", expect: ["VC-XSS-DOM"] },
 ];

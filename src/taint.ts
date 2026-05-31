@@ -66,6 +66,9 @@ export function isTainted(node: t.Node | null | undefined, set: Set<string>): bo
       if (isSourceExpr(node)) return true;
       const callee = node.callee;
       if (t.isIdentifier(callee) && NUMERIC.has(callee.name)) return false; // numeric coercion sanitizes
+      if (t.isMemberExpression(callee) && t.isIdentifier(callee.object) && callee.object.name === "JSON" && t.isIdentifier(callee.property) && callee.property.name === "parse") {
+        return node.arguments.some((a) => isTainted(a as t.Node, set)); // JSON.parse does NOT sanitize
+      }
       if (t.isMemberExpression(callee) && t.isIdentifier(callee.property) && VALIDATE.has(callee.property.name)) return false; // schema.parse(x)
       if (t.isIdentifier(callee) && callee.name === "String") return node.arguments.some((a) => isTainted(a as t.Node, set));
       if (t.isMemberExpression(callee) && t.isIdentifier(callee.object) && callee.object.name === "path" && t.isIdentifier(callee.property) && ["join", "resolve", "normalize"].includes(callee.property.name)) {
@@ -89,34 +92,35 @@ function patternNames(node: t.Node | null): string[] {
   return [];
 }
 
-/** Per-function (and top-level) sets of tainted variable names, computed to a fixpoint. */
+/** Per-function (and top-level) tainted variable sets. Last-write-wins (flow-insensitive within a
+ *  scope, but a later sanitizing assignment removes taint), computed to a fixpoint. */
 export function buildTaintSets(file: t.File): Map<t.Node, Set<string>> {
-  const recs = new Map<t.Node, { names: string[]; expr: t.Node | null | undefined }[]>();
-  const add = (scope: t.Node, rec: { names: string[]; expr: t.Node | null | undefined }) => {
-    const list = recs.get(scope) ?? [];
-    list.push(rec);
-    recs.set(scope, list);
+  const last = new Map<t.Node, Map<string, t.Node | null | undefined>>();
+  const put = (scope: t.Node, name: string, expr: t.Node | null | undefined) => {
+    const m = last.get(scope) ?? new Map();
+    m.set(name, expr);
+    last.set(scope, m);
   };
   const scopeOf = (path: NodePath): t.Node => path.getFunctionParent()?.node ?? file.program;
   traverse(file, {
     VariableDeclarator(path) {
-      const names = patternNames(path.node.id);
-      if (names.length) add(scopeOf(path), { names, expr: path.node.init });
+      for (const n of patternNames(path.node.id)) put(scopeOf(path), n, path.node.init);
     },
     AssignmentExpression(path) {
       if (path.node.operator !== "=") return;
-      const names = patternNames(path.node.left);
-      if (names.length) add(scopeOf(path), { names, expr: path.node.right });
+      for (const n of patternNames(path.node.left)) put(scopeOf(path), n, path.node.right);
     },
   });
   const sets = new Map<t.Node, Set<string>>();
-  for (const [scope, list] of recs) {
+  for (const [scope, m] of last) {
     const s = new Set<string>();
     sets.set(scope, s);
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       let changed = false;
-      for (const r of list) {
-        if (isTainted(r.expr, s)) for (const n of r.names) if (!s.has(n)) { s.add(n); changed = true; }
+      for (const [name, expr] of m) {
+        const tainted = isTainted(expr, s);
+        if (tainted && !s.has(name)) { s.add(name); changed = true; }
+        else if (!tainted && s.has(name)) { s.delete(name); changed = true; }
       }
       if (!changed) break;
     }

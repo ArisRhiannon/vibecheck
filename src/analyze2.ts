@@ -64,7 +64,10 @@ export function astFindings(files: SourceFile[]): Finding[] {
           const m = callee.property.name;
           const rawApi = m === "raw" || m === "$queryRawUnsafe" || m === "$executeRawUnsafe";
           const queryApi = m === "query" || m === "execute";
-          if ((rawApi || queryApi) && arg0 && !literalish(arg0)) {
+          const objName = t.isIdentifier(callee.object) ? callee.object.name : "";
+          const callSrc = f.content.slice(node.start ?? 0, node.end ?? 0);
+          const looksDb = /^(?:db|sql|conn|connection|pool|client|knex|sequelize|prisma|pg|mysql|mysql2|sqlite|database|datasource|ds|orm|tx|trx|qb|repo|repository)$/i.test(objName) || /\b(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)\b/i.test(callSrc);
+          if ((rawApi || (queryApi && looksDb)) && arg0 && !literalish(arg0)) {
             if (tainted(arg0)) mk(node, "VC-SQLI", "critical", "high", `SQL via ${m}() built from tainted input (SQL injection)`, "Use parameterized queries / bound placeholders; never interpolate user input.");
             else if (t.isTemplateLiteral(arg0) || (t.isBinaryExpression(arg0) && arg0.operator === "+")) mk(node, "VC-SQLI", "medium", "review", `SQL via ${m}() built by interpolation/concatenation (verify the values are not user-controlled)`, "Prefer parameterized queries / bound placeholders.");
           }
@@ -82,7 +85,7 @@ export function astFindings(files: SourceFile[]): Finding[] {
           mk(node, "VC-OPEN-REDIRECT", "medium", "high", "redirect target is tainted (open redirect)", "Redirect only to a fixed allowlist of paths/hosts.");
         }
         // document.write(tainted) → XSS
-        if (cp === "document.write" && tainted(arg0)) mk(node, "VC-XSS-DOM", "high", "high", "document.write() with tainted input (DOM XSS)", "Avoid document.write; set textContent or sanitize HTML.");
+        if ((cp === "document.write" || cp === "document.writeln") && tainted(arg0)) mk(node, "VC-XSS-DOM", "high", "high", "document.write()/writeln() with tainted input (DOM XSS)", "Avoid document.write; set textContent or sanitize HTML.");
         // jwt.verify options
         if (cp === "jwt.verify") {
           const opts = node.arguments[2] as t.Node | undefined;

@@ -1,4 +1,4 @@
-import { scanProject } from "./engine";
+import { scanProject, countBySeverity } from "./engine";
 
 interface RpcReq { jsonrpc?: string; id?: number | string | null; method?: string; params?: { name?: string; arguments?: { dir?: string; includeAll?: boolean } } }
 
@@ -26,7 +26,7 @@ function handle(req: RpcReq): void {
       try {
         const r = scanProject(req.params.arguments?.dir ?? ".");
         const findings = req.params.arguments?.includeAll ? r.findings : r.findings.filter((f) => f.confidence === "high");
-        send({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify({ findings, counts: r.counts }) }], isError: false } });
+        send({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify({ findings, counts: countBySeverity(findings) }) }], isError: false } });
       } catch (e) {
         send({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: `error: ${(e as Error).message}` }], isError: true } });
       }
