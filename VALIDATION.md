@@ -13,8 +13,8 @@
 | `bun run typecheck` | ✅ PASS | `tsc --noEmit` exit 0, zero errors |
 | `bun test` | ✅ PASS | 29 tests, 0 failures, 84 expect() calls, 323ms |
 | Zero runtime deps | ✅ PASS | `package.json .dependencies` = `{}` |
-| License field | ✅ PASS | `"license": "SEE LICENSE IN LICENSE"` |
-| LICENSE file | ✅ PASS | Contains full AGPL-3.0 text + "ADDITIONAL TERMS - COMMERCIAL LICENSE REQUIREMENT" |
+| License field | ✅ PASS | `"license": "MIT"` |
+| LICENSE file | ✅ PASS | Contains the MIT License text |
 | CI workflow | ✅ PASS | `.github/workflows/ci.yml` runs install + typecheck + test |
 | ADRs | ✅ PASS | 2 ADRs: `0001-heuristic-scanning.md`, `0002-agent-first.md` |
 

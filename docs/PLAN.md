@@ -2,11 +2,11 @@
 
 Role: PM. Author: Aris Rhiannon. `create-issue-gate` contract: ACs are testable/pass-fail. Each rule
 ships with a **vulnerable fixture (must fire)** and a **safe fixture (must stay quiet)**. TDD,
-**incremental human commits**. Stack: TypeScript (strict), Bun, zero runtime deps, AGPL+commercial.
+**incremental human commits**. Stack: TypeScript (strict), Bun, zero runtime deps, MIT.
 
 ## Phase 0 — Scaffold
 AC0.1 `bun test` runs ≥1 test, exit 0. AC0.2 `tsc --noEmit` strict clean. AC0.3 `dependencies` empty;
-`license`="SEE LICENSE IN LICENSE". AC0.4 CI runs install+typecheck+test.
+`license`="MIT". AC0.4 CI runs install+typecheck+test.
 
 ## Phase 1 — Walk + file model + types
 AC1.1 walk skips node_modules/.git/dist/build/coverage and honors root `.gitignore` simple globs.

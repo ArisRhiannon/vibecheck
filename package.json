@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Offline, zero-dependency, no-AI 'safe to ship?' gate for vibe-coded apps. Finds the mistakes AI coding agents make (unprotected routes, committed secrets, eval-RCE, permissive CORS, weak JWT, missing validation, leaky config). Agent-runnable via CLI/JSON/MCP.",
   "type": "module",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "author": "Aris Rhiannon",
   "homepage": "https://github.com/ArisRhiannon/vibecheck#readme",
   "repository": { "type": "git", "url": "git+https://github.com/ArisRhiannon/vibecheck.git" },

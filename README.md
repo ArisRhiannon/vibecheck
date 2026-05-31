@@ -1,7 +1,7 @@
 # vibecheck
 
 [![ci](https://github.com/ArisRhiannon/vibecheck/actions/workflows/ci.yml/badge.svg)](https://github.com/ArisRhiannon/vibecheck/actions/workflows/ci.yml)
-[![License: AGPL-3.0 + Commercial](https://img.shields.io/badge/license-AGPL--3.0%20%2B%20Commercial-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **An offline, zero-dependency, no-AI "safe to ship?" gate for vibe-coded apps.** It finds the exact
 mistakes AI coding agents make — committed secrets, unprotected routes, `eval`-RCE, SQL injection,
@@ -99,8 +99,4 @@ independent validation in `VALIDATION.md`.
 
 ## License
 
-Source-available — **not** OSI open source. Free under the GNU **AGPL-3.0** for individuals,
-non-profits, and organizations below **US$1M annual revenue and 50 employees**; larger organizations
-require a commercial license. See [LICENSE](LICENSE).
-
-© 2026 Aris Rhiannon
+MIT © 2026 Aris Rhiannon — see [LICENSE](LICENSE).

@@ -18,4 +18,4 @@
 
 ## Notes
 - Heuristic, not a full taint analyzer; a high-signal gate, not a proof of security.
-- License: source-available (AGPL-3.0 + commercial threshold). See LICENSE.
+- License: MIT. See LICENSE.

@@ -57,4 +57,4 @@ Full multi-language taint analysis; Python/Go/Ruby detectors; autofix; runtime/D
 
 ## Definition of done
 SC1–SC8 met & independently validated (VALIDATION.md), QA addressed, pushed to GitHub under ArisRhiannon
-(AGPL-3.0 + commercial), CI green, with incremental human commits.
+(MIT), CI green, with incremental human commits.

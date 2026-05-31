@@ -153,7 +153,7 @@ All missed bypasses are within the tool's stated threat model ("heuristic, not a
 
 - Runtime performance benchmarking (no execution environment for timing)
 - Actual CI pipeline behavior (`.github/workflows/ci.yml` not deeply reviewed)
-- License compliance (AGPL-3.0 + commercial terms)
+- License compliance (MIT)
 - Cross-platform path handling (Windows `\` separators — `walk.ts` normalizes to `/`)
 
 ## False positives eliminated
