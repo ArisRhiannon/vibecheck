@@ -64,7 +64,7 @@ Every finding has a **confidence**:
 ## Install & use
 
 ```sh
-bun add -d vibecheck    # or: npm i -D vibecheck (Node >= 20)
+npm i -D @arisrhiannon/vibecheck    # or: bun add -d @arisrhiannon/vibecheck (Node >= 20)
 vibecheck . --ci
 vibecheck explain VC-SQLI
 vibecheck mcp           # MCP stdio server exposing a `scan` tool (high-confidence by default)

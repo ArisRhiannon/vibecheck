@@ -1,5 +1,5 @@
 {
-  "name": "vibecheck",
+  "name": "@arisrhiannon/vibecheck",
   "version": "0.1.0",
   "description": "Agent-native 'safe to ship?' gate for vibe-coded apps: real parsers (Babel JS/TS + Python ast + Go go/parser) with inter-procedural (return-taint + cross-file) taint for the AI-failure classes (secrets, SQLi via raw APIs, XSS, SSRF, path traversal, command injection, insecure deserialization, weak JWT/CORS/cookies), confidence scoring and measured precision/recall. CLI + MCP. Complements Semgrep/CodeQL.",
   "type": "module",
@@ -14,31 +14,31 @@
     "url": "https://github.com/ArisRhiannon/vibecheck/issues"
   },
   "keywords": ["vibe-coding", "security", "sast", "taint-analysis", "ast", "babel", "secrets", "owasp", "ai-generated-code", "agent", "mcp", "llms-txt", "ci", "ship-gate", "typescript"],
-  "main": "src/index.ts",
-  "module": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js"
   },
   "bin": {
-    "vibecheck": "src/cli.ts"
+    "vibecheck": "dist/cli.js"
   },
-  "files": ["src", "docs", "AGENTS.md", "llms.txt", "LICENSE", "README.md"],
+  "files": ["dist", "docs/CORPUS.md", "AGENTS.md", "llms.txt", "LICENSE", "README.md"],
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
+    "build": "bun run scripts/build.ts",
+    "prepublishOnly": "bun run build",
     "check": "bun run typecheck && bun test"
   },
   "engines": {
     "bun": ">=1.1.0",
     "node": ">=20"
   },
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
     "@babel/parser": "^7.29.7",
     "@babel/traverse": "^7.29.7",
-    "@babel/types": "^7.29.7"
-  },
-  "devDependencies": {
+    "@babel/types": "^7.29.7",
     "@types/babel__traverse": "^7.28.0",
     "@types/bun": "^1.1.0",
     "@types/node": "^22.0.0",
