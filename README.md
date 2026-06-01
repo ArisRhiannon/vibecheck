@@ -52,7 +52,7 @@ OSS repos, 1,218 files, manually triaged), see [`docs/CORPUS.md`](docs/CORPUS.md
 critical bug (Python/Go files weren't being scanned in real scans) and drove precision fixes (relative
 redirects, server-source-only SSRF).
 
-## Confidence (the anti-false-positive-loop design)
+## Confidence 
 
 Every finding has a **confidence**:
 - `high` — a user-input **source provably flows into the sink** (taint-backed), or a deterministic fact
@@ -89,7 +89,7 @@ Taint-backed: `VC-RCE-EVAL`, `VC-RCE-CHILD-PROCESS`, `VC-SQLI`, `VC-XSS-REACT`, 
 `VC-PY-PATH`. **Go** (`VC-GO-*`): `VC-GO-CMDI`, `VC-GO-SQLI`, `VC-GO-PATH`, `VC-GO-OPEN-REDIRECT`,
 `VC-GO-SSRF`. `vibecheck explain <id>` prints the fix for each.
 
-## Limitations (honest)
+## Limitations
 
 - **JS/TS/JSX/TSX + Python + Go** (Python needs `python3`, Go needs a `go` toolchain on PATH). More
   languages are roadmap (each via its own real parser, never hand-rolled).
