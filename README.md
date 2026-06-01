@@ -78,7 +78,7 @@ high-confidence finding.
 > those files are skipped; if an analyzer **fails**, a warning is printed to **stderr** (so a crash never
 > silently drops findings).
 
-## Rules (exactly what is implemented + benchmarked)
+## Rules (implemented + benchmarked)
 
 Taint-backed: `VC-RCE-EVAL`, `VC-RCE-CHILD-PROCESS`, `VC-SQLI`, `VC-XSS-REACT`, `VC-XSS-DOM`, `VC-SSRF`,
 `VC-PATH-TRAVERSAL`, `VC-OPEN-REDIRECT`. AST config: `VC-CORS-WILDCARD`, `VC-JWT-NONE`,
