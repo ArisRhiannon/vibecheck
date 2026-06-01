@@ -1,6 +1,6 @@
 {
   "name": "@arisrhiannon/vibecheck",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Agent-native 'safe to ship?' gate for vibe-coded apps: real parsers (Babel JS/TS + Python ast + Go go/parser) with inter-procedural (return-taint + cross-file) taint for the AI-failure classes (secrets, SQLi via raw APIs, XSS, SSRF, path traversal, command injection, insecure deserialization, weak JWT/CORS/cookies), confidence scoring and measured precision/recall. CLI + MCP. Complements Semgrep/CodeQL.",
   "type": "module",
   "license": "MIT",
