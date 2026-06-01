@@ -75,7 +75,11 @@ function serverTaintSets(file: t.File): Map<t.Node, Set<string>> {
     const sv = new Set<string>();
     for (let i = 0; i < 6; i++) {
       let changed = false;
-      for (const { name, expr } of recs) if (hasServerContributor(expr, sv) && !sv.has(name)) { sv.add(name); changed = true; }
+      for (const { name, expr } of recs) {
+        const sc = hasServerContributor(expr, sv);
+        if (sc && !sv.has(name)) { sv.add(name); changed = true; }
+        else if (!sc && sv.has(name)) { sv.delete(name); changed = true; } // symmetric with buildTaintSets: a clean reassignment clears server-taint
+      }
       if (!changed) break;
     }
     out.set(scope, sv);

@@ -22,9 +22,11 @@ export function envFindings(files: SourceFile[]): Finding[] {
       out.push({ ruleId: "VC-ENV-COMMITTED", severity: "high", confidence: "high", file: f.rel, line: 1, col: 1, message: `${base(f.rel)} is not gitignored — secrets in it are likely committed`, snippet: base(f.rel), remediation: "Add .env to .gitignore, purge it from git history, and rotate any secret it held." });
     }
   }
-  const real = files.find((f) => isEnv(f.rel) && !isExample(f.rel));
-  const example = files.find((f) => isExample(f.rel));
-  if (real && example) {
+  const dirOf = (rel: string): string => (rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "");
+  const examples = files.filter((f) => isExample(f.rel));
+  for (const real of files.filter((f) => isEnv(f.rel) && !isExample(f.rel))) {
+    const example = examples.find((e) => dirOf(e.rel) === dirOf(real.rel));
+    if (!example) continue;
     const rk = envKeys(real.content), ek = envKeys(example.content);
     const undocumented = [...rk].filter((k) => !ek.has(k));
     const missing = [...ek].filter((k) => !rk.has(k));

@@ -1,6 +1,6 @@
 import { type SourceFile, type Finding, type Severity } from "./types";
 import { parseFile, traverse, t } from "./ast";
-import { buildTaintSets, buildSummaries, taintedAt, isTainted, isSourceExpr, resolveImports, markShadowedSources, type Summaries } from "./taint";
+import { buildTaintSets, buildSummaries, returnTainted, taintedAt, isTainted, isSourceExpr, resolveImports, markShadowedSources, type Summaries } from "./taint";
 
 const JS = /\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
 const CP = new Set(["exec", "execSync", "execFile", "execFileSync", "spawn", "spawnSync"]);
@@ -35,12 +35,12 @@ function paramName(p: t.Node): string | null {
   return null;
 }
 
-function fixpoint(assigns: Array<{ names: string[]; expr: t.Node | null | undefined }>, seed: Set<string>): Set<string> {
+function fixpoint(assigns: Array<{ names: string[]; expr: t.Node | null | undefined }>, seed: Set<string>, summaries: Summaries): Set<string> {
   const s = new Set(seed);
   for (let k = 0; k < 6; k++) {
     let changed = false;
     for (const { names, expr } of assigns) {
-      const tt = isTainted(expr, s);
+      const tt = isTainted(expr, s) || returnTainted(expr, s, summaries);
       for (const n of names) {
         if (tt && !s.has(n)) { s.add(n); changed = true; }
         else if (!tt && s.has(n)) { s.delete(n); changed = true; }
@@ -79,12 +79,13 @@ export function interprocFindings(files: SourceFile[], summariesByRel?: Map<stri
       AssignmentExpression(path) { const fn = path.getFunctionParent()?.node; if (fn && path.node.operator === "=" && t.isIdentifier(path.node.left)) add(assignsByFn, fn, { names: [path.node.left.name], expr: path.node.right }); },
       CallExpression(path) { const fn = path.getFunctionParent()?.node; const hit = matchSink(path.node); if (fn && hit) add(sinksByFn, fn, hit); },
     });
+    const summaries = summariesByRel?.get(f.rel) ?? buildSummaries(ast);
     const summary = new Map<string, ParamSink[]>();
     for (const [name, fn] of fns) {
       const sinks = sinksByFn.get(fn.node) ?? [];
       const assigns = assignsByFn.get(fn.node) ?? [];
       const ps: ParamSink[] = [];
-      fn.params.forEach((pn, i) => { if (!pn) return; const set = fixpoint(assigns, new Set([pn])); for (const hit of sinks) if (isTainted(hit.arg, set)) ps.push({ param: i, hit }); });
+      fn.params.forEach((pn, i) => { if (!pn) return; const set = fixpoint(assigns, new Set([pn]), summaries); for (const hit of sinks) if (isTainted(hit.arg, set) || returnTainted(hit.arg, set, summaries)) ps.push({ param: i, hit }); });
       if (ps.length) summary.set(name, ps);
     }
     infos.push({ f, ast, summary });

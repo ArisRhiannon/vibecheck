@@ -16,4 +16,8 @@ describe("SSRF requires a server source, not client-side DOM location (corpus-dr
     expect(has("const host = document.location.hostname;\nfetch('https://' + host + '/api');", "VC-SSRF")).toBe(false);
     expect(has("const base = window.location.origin;\nfetch(base + '/api');", "VC-SSRF")).toBe(false);
   });
+  test("a server-tainted var REASSIGNED to a client-side location is NOT SSRF (Bug 2 regression)", () => {
+    // server-taint must clear on the clean/client reassignment (serverTaintSets symmetric with buildTaintSets)
+    expect(has("let u = req.body.url;\nu = document.location.href;\nfetch(u);", "VC-SSRF")).toBe(false);
+  });
 });

@@ -23,17 +23,24 @@ function globToRe(pattern: string): RegExp {
   if (anchored) p = p.slice(1);
   const dirOnly = p.endsWith("/");
   if (dirOnly) p = p.slice(0, -1);
-  const re = p.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*").replace(/\?/g, "[^/]");
+  const re = p.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*\//g, "\u0000").replace(/\*\*/g, "\u0001") // ** spans path separators
+    .replace(/\*/g, "[^/]*").replace(/\?/g, "[^/]")
+    .replace(/\u0000/g, "(?:[^/]+/)*").replace(/\u0001/g, ".*");
   return new RegExp(`${anchored ? "^" : "(^|/)"}${re}${dirOnly ? "(/|$)" : "($|/)"}`);
 }
 
 function loadGitignore(root: string): (rel: string) => boolean {
   const p = join(root, ".gitignore");
   if (!existsSync(p)) return () => false;
-  const res = readFileSync(p, "utf8")
-    .split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#") && !l.startsWith("!"))
-    .map(globToRe);
-  return (rel) => res.some((r) => r.test(rel));
+  const rules = readFileSync(p, "utf8")
+    .split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"))
+    .map((l) => (l.startsWith("!") ? { neg: true, re: globToRe(l.slice(1)) } : { neg: false, re: globToRe(l) }));
+  return (rel) => {
+    let ignored = false;
+    for (const r of rules) if (r.re.test(rel)) ignored = !r.neg; // last matching rule wins (git semantics)
+    return ignored;
+  };
 }
 
 /** Recursively collect text files, skipping build dirs, gitignored paths, binaries, and huge files. */

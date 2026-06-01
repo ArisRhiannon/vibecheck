@@ -46,4 +46,16 @@ describe("AC2.3/2.4 env", () => {
     expect(got.has("VC-ENV-DRIFT")).toBe(true); // B undocumented
     expect(got.has("VC-ENV-MISSING")).toBe(true); // C missing from .env
   });
+  test("drift is paired per-directory, not mispaired across packages (Bug A regression)", () => {
+    const f = envFindings([
+      sf("pkgA/.env", "A=1"), sf("pkgA/.env.example", "A="),       // matched → no drift
+      sf("pkgB/.env", "B=1\nX=2"), sf("pkgB/.env.example", "B="),  // X undocumented in pkgB only
+    ]);
+    const drift = f.filter((x) => x.ruleId === "VC-ENV-DRIFT");
+    expect(drift.length).toBe(1);
+    expect(drift[0]!.file).toBe("pkgB/.env.example");
+    expect(drift[0]!.message).toContain("X");
+    // pkgA matches its own example → no bogus cross-package drift/missing
+    expect(f.some((x) => x.ruleId === "VC-ENV-MISSING")).toBe(false);
+  });
 });

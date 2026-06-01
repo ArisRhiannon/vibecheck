@@ -22,4 +22,10 @@ describe("inter-procedural (intra-file) taint via function summaries", () => {
   test("inter-procedural findings are high confidence", () => {
     expect(run("function q(s){ db.query(s); }\nq(req.body.x);")[0]?.confidence).toBe("high");
   });
+  test("taint reaching a sink THROUGH a nested return-tainting helper is detected (Bug 3 regression)", () => {
+    // run()'s param flows into exec() only via unwrap()'s return value — the local fixpoint must use returnTainted.
+    expect(has("function unwrap(o){ return o.value; }\nfunction run(cmd){ const real = unwrap(cmd); exec(real); }\nrun(req.body);", "VC-RCE-CHILD-PROCESS")).toBe(true);
+    // and when the helper's return value is passed straight into the sink call
+    expect(has("function pick(o){ return o.q; }\nfunction q(s){ db.query(pick(s)); }\nq(req.body);", "VC-SQLI")).toBe(true);
+  });
 });
