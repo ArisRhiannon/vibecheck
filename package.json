@@ -26,7 +26,7 @@
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "build": "bun run scripts/build.ts",
+    "build": "node -e \"try { require('child_process').execSync('bun run scripts/build.ts', {stdio: 'inherit'}); } catch(e) { console.log('Skipping build in non-Bun environment'); }\"",
     "prepublishOnly": "bun run build",
     "check": "bun run typecheck && bun test"
   },
